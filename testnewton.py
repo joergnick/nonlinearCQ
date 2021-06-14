@@ -1,26 +1,24 @@
 from cqRK import CQModel
 class ScatModel(CQModel):
 	def precomputing(self,s):
-		return s**2
+		return np.array([[s,1],[1,s]])
 	def harmonicForward(self,s,b,precomp = None):
-		return precomp*b
-	def harmonicBackward(self,s,b,precomp = None):
-		return precomp**(-1)*b
+		return precomp.dot(b)
 	def righthandside(self,t,history = None):
-		return 8*7*t**6
-		#return 3*t**2+t**9
+		return np.array([3*t**2+t**4+t**6,5*t**3+t**12])
 	def nonlinearity(self,x):
-		return 0*x
-		#return x**3
+		#return 0*x
+		return np.array([x[0]**2,x[1]**(3)])
 model = ScatModel()
 T = 1
-Am = 5
+Am = 4
 m=3
 import numpy as np
 taus = np.zeros(Am)
 err = np.zeros(Am)
 Ns  = np.zeros(Am)
 comp = np.zeros(Am)
+#print(np.kron(np.array([[1,2],[3,4]]),np.identity(3)))
 for j in range(Am):
 	N = 8*2**j
 	#N = 2*(2*2**j-1)
@@ -29,19 +27,21 @@ for j in range(Am):
 	taus[j] =tau 
 	tt = np.linspace(0,T,N+1)
 	#ex_sol = 1.0/30*tt**6
-	ex_sol = tt**8
+	ex_sol = tt**3
 	#ex_sol = 4*3*tt**2
 	#method = "BDF-"+str(m)
 	method = "RadauIIA-"+str(m)
-	sol = model.simulate(T,N,1,method = method)
+	sol = model.simulate(T,N,2,method = method)
+
 	#err[j] = np.abs(sol[0,2]-tau**3)
 	#print(err)
 	err[j] = max(np.abs(sol[0,::m]-ex_sol))
 	#err[j] = np.abs(sol[0,-1])
-
+#
 #	import matplotlib.pyplot as plt
-#	print(sol)
-#	plt.plot(sol[0,:])
+##	print(sol)
+#	plt.plot(sol[0,::m])
+#	#plt.plot(sol[1,::m])
 #	plt.plot(ex_sol,linestyle='dashed')
 #	plt.show()
 print(err)
@@ -56,9 +56,9 @@ print(err)
 #plt.plot(sol[0,::2])
 ##plt.plot(ex_sol,linestyle='dashed')
 #plt.show()
-
-import matplotlib.pyplot as plt
-plt.loglog(taus,err)
-plt.loglog(taus,taus**1,linestyle = 'dashed')
-plt.show()
+#
+#import matplotlib.pyplot as plt
+#plt.loglog(taus,err)
+#plt.loglog(taus,taus**2,linestyle = 'dashed')
+#plt.show()
 	#

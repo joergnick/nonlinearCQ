@@ -35,6 +35,8 @@ class CQModel2:
 		dof = len(rhs)
 		grada = np.zeros((dof,dof))
 		taugrad = 10**(-8)
+		### WARNING: WRONG GRADIENT
+		print("WARNING; THE GRADIENT IS WRONG AND SHOULD BE UPDATED!")
 		for j in range(dof):
 			grada[j,j] = (self.nonlinearity(x0[j]+taugrad)-self.nonlinearity(x0[j]+taugrad))/(2*taugrad)
 		rhs = W0*x0+self.nonlinearity(x0)-rhs

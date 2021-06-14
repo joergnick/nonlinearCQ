@@ -32,17 +32,22 @@ class CQModel:
 		return self.harmonicForward(s,b,precomp=self.freqObj[s])
 
 	def newtonsolver(self,s,rhs,W0,Tdiag, x0,charMatrix0):
+		import math
 		dof = len(rhs)
 		m = len(W0)
 		Tinv = np.linalg.inv(Tdiag)
 		grada = np.zeros((m*dof,m*dof))
 		rhsLong = 1j*np.zeros(m*dof)
 		taugrad = 10**(-8)
-		for j in range(dof):
-			for i in range(m):
-				grada[i*dof+j,i*dof+j] = (self.nonlinearity(x0[j,i]+taugrad)-self.nonlinearity(x0[j,i]+taugrad))/(2*taugrad)
+		idMat = np.identity(dof)
+
+		for stageIndx,stageIndy in zip(range(m),range(m)):
+			for i,j in zip(range(dof),range(dof)):
+				grada[stageIndy*dof+i,stageIndx*dof+j] = (self.nonlinearity(x0[:,stageIndx]+taugrad*idMat[:,i])[j]-self.nonlinearity(x0[:,stageIndx]-taugrad*idMat[:,i])[j])/(2*taugrad)
+				if math.isnan(grada[stageIndx*dof+i,stageIndy*dof+j]):
+					grada[stageIndx*dof+j,stageIndy*dof+j]=0
 		#rhs = W0*x0+self.nonlinearity(x0)-rhs
-		stageRHS = 1j*np.zeros((dof,m))
+		stageRHS = x0+1j*np.zeros((dof,m))
 		## Calculating right-hand side
 		stageRHS = np.matmul(stageRHS,Tinv.T)
 		for stageInd in range(m):
@@ -50,14 +55,20 @@ class CQModel:
 		stageRHS = np.matmul(stageRHS,Tdiag.T)
 		rhsNewton = stageRHS+self.nonlinearity(x0)-rhs
 		## Solving system W0y = b
+		#print("SecondMatrix: ",np.matmul(np.matmul(Tdiag,grada),Tinv))
 		rhsNewton = np.matmul(rhsNewton,Tinv.T)
 		for stageInd in range(m):
 			rhsLong[stageInd*dof:(stageInd+1)*dof] = rhsNewton[:,stageInd]
 		def NewtonFunc(xdummy):
+			idMat  = np.identity(dof)
+			Tinvdof = np.kron(Tinv,idMat)
+			Tdiagdof = np.kron(Tdiag,idMat)
 			ydummy = 1j*np.zeros(dof*m)
 			for j in range(m):	
 				ydummy[j*dof:(j+1)*dof] = self.harmonicForward(s[j],xdummy[j*dof:(j+1)*dof],precomp = W0[j])
+			ydummy = ydummy+np.matmul(np.matmul(Tdiagdof,grada),Tinvdof).dot(xdummy)
 			return ydummy
+
 		from scipy.sparse.linalg import LinearOperator
 		NewtonLambda = lambda x: NewtonFunc(x)
 		NewtonOperator = LinearOperator((m*dof,m*dof),NewtonLambda)
@@ -67,9 +78,10 @@ class CQModel:
 		dx = 1j*np.zeros((dof,m))
 		for stageInd in range(m):
 			dx[:,stageInd] = dxlong[dof*stageInd:dof*(stageInd+1)]
-		### WARNING TRANSPOSING MIGHT CAUSE TROUBLE WITH BEMPP
 		dx = np.matmul(dx,Tdiag.T)	
 		x1 = x0-dx
+#		print("norm(dx): ", np.linalg.norm(dx))
+#		print("norm(x1): ", np.linalg.norm(x1))
 		return x1
 		#return np.matmul(rhsNewton,np.linalg.inv(charMatrix0).T)
 
@@ -107,9 +119,6 @@ class CQModel:
 		[A_RK,b_RK,c_RK,m] = self.tdForward.get_method_characteristics(method)
 		charMatrix0 = np.linalg.inv(A_RK)/tau
 		deltaEigs,Tdiag =np.linalg.eig(charMatrix0)	
-		print("Used method: ", method)
-		print(charMatrix0)
-		print("Cond ", np.linalg.cond(Tdiag))
 	#	print(np.matmul(Tdiag,np.linalg.inv(Tdiag)))
 	#	print(np.matmul(np.matmul(np.linalg.inv(Tdiag),charMatrix0),Tdiag))
 		W0 = []
@@ -119,21 +128,22 @@ class CQModel:
 		#W0 = self.precomputing(zeta0)
 		rhs = np.zeros((dof,m*N+1))
 		sol = np.zeros((dof,m*N+1))
+		extr = np.zeros((dof,m))
 		for j in range(0,N):
-			#print(j)
 			## Calculating solution at timepoint tj
 			tj       = tau*j
 			for i in range(m):
 				rhs[:,j*m+i+1] = rhs[:,j*m+i+1] + self.righthandside(tj+c_RK[i]*tau,history=sol[:,:j*m])
-#			if j >=2:
-#				extr = self.extrapol(sol[:,:j*m+i:m],2*m)
-#				sol[:,j] = self.newtonsolver(zeta0,rhs[:,j],W0,1,extr)
-#			else:
-#				extr = np.zeros(dof)
-#				sol[:,j] = self.newtonsolver(zeta0,rhs[:,j],W0,1,extr)
-#
-			extr = np.zeros((dof,m))
+				if j >=1:
+					extr[:,i] = self.extrapol(sol[:,:j*m+i:m],m+1)
+				else:
+					extr[:,i] = np.zeros(dof)
+
 			sol[:,j*m+1:(j+1)*m+1] = np.real(self.newtonsolver(deltaEigs,rhs[:,j*m+1:(j+1)*m+1],W0,Tdiag,extr,charMatrix0))
+			sol[:,j*m+1:(j+1)*m+1] = np.real(self.newtonsolver(deltaEigs,rhs[:,j*m+1:(j+1)*m+1],W0,Tdiag,sol[:,j*m+1:(j+1)*m+1],charMatrix0))
+			sol[:,j*m+1:(j+1)*m+1] = np.real(self.newtonsolver(deltaEigs,rhs[:,j*m+1:(j+1)*m+1],W0,Tdiag,sol[:,j*m+1:(j+1)*m+1],charMatrix0))
+			sol[:,j*m+1:(j+1)*m+1] = np.real(self.newtonsolver(deltaEigs,rhs[:,j*m+1:(j+1)*m+1],W0,Tdiag,sol[:,j*m+1:(j+1)*m+1],charMatrix0))
+			sol[:,j*m+1:(j+1)*m+1] = np.real(self.newtonsolver(deltaEigs,rhs[:,j*m+1:(j+1)*m+1],W0,Tdiag,sol[:,j*m+1:(j+1)*m+1],charMatrix0))
 			## Calculating Local History:
 			currLen = lengths[j]
 			localHist = np.concatenate((sol[:,m*(j+1)+1-m*currLen:m*(j+1)+1],np.zeros((dof,m*currLen))),axis=1)
@@ -143,10 +153,6 @@ class CQModel:
 				break
 			## Updating Global History:	
 			currLenCut = min(currLen,N-j-1)
-		#	print(localconvHist)
-		#	print(localconvHist[:,currLen*m:currLen*m+currLenCut*m])
-		#	print(currLen)
-		#	print(currLenCut)
 			rhs[:,(j+1)*m+1:(j+1)*m+1+currLenCut*m] = rhs[:,(j+1)*m+1:(j+1)*m+1+currLenCut*m]-localconvHist[:,currLen*m:currLen*m+currLenCut*m]
 		self.freqUse = dict()
 		self.freqObj = dict()
