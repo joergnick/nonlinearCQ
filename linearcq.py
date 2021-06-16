@@ -1,8 +1,6 @@
-
-class Conv_Operator:
-	import numpy as np
+import numpy as np
+class Conv_Operator():
 	tol=10**-14
-		
 	def __init__(self,apply_elliptic_operator,order=2):
 		self.order=order
 		self.delta=lambda zeta : self.char_functions(zeta,order)
@@ -70,8 +68,6 @@ class Conv_Operator:
 		return rhs,N
 
 	def apply_RKconvol(self,rhs,T,show_progress=True,method="RadauIIA-2",cutoff=10**(-8)):
-		import numpy as np
-		import bempp.api
 		## Step 1
 		[A_RK,b_RK,c_RK,m]=self.get_method_characteristics(method)
 		self.m=m	
@@ -161,8 +157,6 @@ class Conv_Operator:
 		return phi_sol
 
 	def apply_convol(self,rhs,T,show_progress=False,method="BDF2",cutoff=10**(-8)):
-		import numpy as np
-		import bempp.api
 		## Step 1
 		#print("In apply_convol")
 		if not len(rhs[0]):
