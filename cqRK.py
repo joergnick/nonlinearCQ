@@ -35,17 +35,26 @@ class CQModel:
 		import math
 		dof = len(rhs)
 		m = len(W0)
+		print("X0",x0)
+		for stageInd in range(m):
+			for j in range(dof):
+				if np.abs(x0[j,stageInd])<10**(-3):
+					x0[j,stageInd] = 10**(-3)
+		print("X0 repaired: ", x0)
 		Tinv = np.linalg.inv(Tdiag)
 		grada = np.zeros((m*dof,m*dof))
 		rhsLong = 1j*np.zeros(m*dof)
-		taugrad = 10**(-8)
+		taugrad = 10**(-5)
 		idMat = np.identity(dof)
-
-		for stageIndx,stageIndy in zip(range(m),range(m)):
-			for i,j in zip(range(dof),range(dof)):
-				grada[stageIndy*dof+i,stageIndx*dof+j] = (self.nonlinearity(x0[:,stageIndx]+taugrad*idMat[:,i])[j]-self.nonlinearity(x0[:,stageIndx]-taugrad*idMat[:,i])[j])/(2*taugrad)
-				if math.isnan(grada[stageIndx*dof+i,stageIndy*dof+j]):
-					grada[stageIndx*dof+j,stageIndy*dof+j]=0
+		for stageIndx in range(m):
+			for stageIndy in range(m):
+				for i in range(dof):
+					for j in range(dof):
+						grada[stageIndy*dof+i,stageIndx*dof+j] = (self.nonlinearity(x0[:,stageIndx]+taugrad*idMat[:,i])[j]-self.nonlinearity(x0[:,stageIndx]-taugrad*idMat[:,i])[j])/(2*taugrad)
+						if math.isnan(grada[stageIndy*dof+i,stageIndx*dof+j]):
+#							print("NAN occuring in gradient, substituted via 0. ")
+							grada[stageIndy*dof+i,stageIndx*dof+j]=0
+		print(grada)
 		#rhs = W0*x0+self.nonlinearity(x0)-rhs
 		stageRHS = x0+1j*np.zeros((dof,m))
 		## Calculating right-hand side
@@ -73,6 +82,7 @@ class CQModel:
 		NewtonLambda = lambda x: NewtonFunc(x)
 		NewtonOperator = LinearOperator((m*dof,m*dof),NewtonLambda)
 		dxlong,info = gmres(NewtonOperator,rhsLong,tol=1e-8)
+		
 		if info != 0:
 			print("GMRES Info not zero, Info: ", info)
 		dx = 1j*np.zeros((dof,m))
@@ -138,8 +148,10 @@ class CQModel:
 					extr[:,i] = self.extrapol(sol[:,:j*m+i:m],m+1)
 				else:
 					extr[:,i] = np.zeros(dof)
-
 			sol[:,j*m+1:(j+1)*m+1] = np.real(self.newtonsolver(deltaEigs,rhs[:,j*m+1:(j+1)*m+1],W0,Tdiag,extr,charMatrix0))
+			sol[:,j*m+1:(j+1)*m+1] = np.real(self.newtonsolver(deltaEigs,rhs[:,j*m+1:(j+1)*m+1],W0,Tdiag,sol[:,j*m+1:(j+1)*m+1],charMatrix0))
+			sol[:,j*m+1:(j+1)*m+1] = np.real(self.newtonsolver(deltaEigs,rhs[:,j*m+1:(j+1)*m+1],W0,Tdiag,sol[:,j*m+1:(j+1)*m+1],charMatrix0))
+			sol[:,j*m+1:(j+1)*m+1] = np.real(self.newtonsolver(deltaEigs,rhs[:,j*m+1:(j+1)*m+1],W0,Tdiag,sol[:,j*m+1:(j+1)*m+1],charMatrix0))
 			sol[:,j*m+1:(j+1)*m+1] = np.real(self.newtonsolver(deltaEigs,rhs[:,j*m+1:(j+1)*m+1],W0,Tdiag,sol[:,j*m+1:(j+1)*m+1],charMatrix0))
 			sol[:,j*m+1:(j+1)*m+1] = np.real(self.newtonsolver(deltaEigs,rhs[:,j*m+1:(j+1)*m+1],W0,Tdiag,sol[:,j*m+1:(j+1)*m+1],charMatrix0))
 			sol[:,j*m+1:(j+1)*m+1] = np.real(self.newtonsolver(deltaEigs,rhs[:,j*m+1:(j+1)*m+1],W0,Tdiag,sol[:,j*m+1:(j+1)*m+1],charMatrix0))
