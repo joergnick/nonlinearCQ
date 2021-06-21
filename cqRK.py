@@ -1,4 +1,5 @@
 from scipy.sparse.linalg import gmres
+from scipy.optimize import newton_krylov
 import numpy as np
 from linearcq import Conv_Operator
 class CQModel:
@@ -10,6 +11,8 @@ class CQModel:
         ## Methods supplied by user:
     def nonlinearity(self,x):
         raise NotImplementedError("No nonlinearity given.")
+    def nonlinearityInverse(self,x):
+        raise NotImplementedError("No inverse to nonlinearity given.")
     def harmonicForward(self,s,b,precomp = None):
         raise NotImplementedError("No time-harmonic forward operator given.")
     def harmonicBackward(self,s,b,precomp = None):
@@ -30,7 +33,7 @@ class CQModel:
             self.freqObj[s] = self.precomputing(s)
             self.freqUse[s] = 1
         return self.harmonicForward(s,b,precomp=self.freqObj[s])
-    def newtonsolver(self,s,rhs,W0,Tdiag, x0,charMatrix0,tol = 10**(-8),coeff = 1):
+    def newtonsolver(self,s,rhs,W0,Tdiag, x0,charMatrix0,tol = 10**(-8),coeff = 1,grada = None):
         dof = len(rhs)
         m = len(W0)
         for stageInd in range(m):
@@ -38,23 +41,16 @@ class CQModel:
                 if np.abs(x0[j,stageInd])<10**(-5):
                     x0[j,stageInd] = 10**(-5)
         Tinv = np.linalg.inv(Tdiag)
-        grada = np.zeros((m*dof,m*dof))
         rhsLong = 1j*np.zeros(m*dof)
-        #taugrad = 10**(-8)
-        taugrad = 10**(-4)*np.linalg.norm(x0)
-        #print(10**(-4)*np.linalg.norm(x0))
-        idMat = np.identity(m*dof)
-        for stageIndx in range(m):
-            for stageIndy in range(m):
-                for i in range(dof):
-                    for j in range(dof):
-                        grada[stageIndy*dof+i,stageIndx*dof+j] = (self.nonlinearity(x0[:,stageIndx]+taugrad*idMat[:,stageIndy*dof+i])[stageIndx*dof+j]-self.nonlinearity(x0[:,stageIndx]-taugrad*idMat[:,stageIndy*dof+i])[stageIndx*dof+j])/(2*taugrad)
-                        if np.isnan(grada[stageIndy*dof+i,stageIndx*dof+j]):
-#                           print("NAN occuring in gradient, substituted via 0. ")
-                            grada[stageIndy*dof+i,stageIndx*dof+j]=0
-        #rhs = W0*x0+self.nonlinearity(x0)-rhs
-        #print("x0: ",x0)
-        #print("grada: ",grada)
+        if grada is None:
+             grada = np.zeros((m*dof,m*dof))
+             taugrad = 10**(-8)
+             idMat = np.identity(dof)
+             for stageInd in range(m):
+                 for i in range(dof):
+                     diff = (self.nonlinearity(x0[:,stageInd]+taugrad*idMat[:,i])-self.nonlinearity(x0[:,stageInd]-taugrad*idMat[:,i]))
+                     #if dof == 1:
+                     grada[stageInd*dof:(stageInd+1)*dof,stageInd*dof+i] = diff/(2*taugrad)
         stageRHS = x0+1j*np.zeros((dof,m))
         ## Calculating right-hand side
         stageRHS = np.matmul(stageRHS,Tinv.T)
@@ -68,6 +64,7 @@ class CQModel:
         #print("rhsNewton",rhsNewton)
         for stageInd in range(m):
             rhsLong[stageInd*dof:(stageInd+1)*dof] = rhsNewton[:,stageInd]
+                        
         def NewtonFunc(xdummy):
             idMat  = np.identity(dof)
             Tinvdof = np.kron(Tinv,idMat)
@@ -77,10 +74,8 @@ class CQModel:
                 ydummy[j*dof:(j+1)*dof] = self.harmonicForward(s[j],xdummy[j*dof:(j+1)*dof],precomp = W0[j])
             ydummy = ydummy+np.matmul(np.matmul(Tdiagdof,grada),Tinvdof).dot(xdummy)
             return ydummy
-        
-        from scipy.sparse.linalg import LinearOperator
         NewtonLambda = lambda x: NewtonFunc(x)
-
+        from scipy.sparse.linalg import LinearOperator
         NewtonOperator = LinearOperator((m*dof,m*dof),NewtonLambda)
         dxlong,info = gmres(NewtonOperator,rhsLong,tol=1e-8)
         if info != 0:
@@ -91,7 +86,6 @@ class CQModel:
             for k in range(m*dof):
                 NewtonMat[:,k] = NewtonFunc(Mid[:,k])
             print("Corresponding Matrix: ", NewtonMat, " Condition: ", np.linalg.cond(NewtonMat), " RHS : ",rhsLong)
-            raise ValueError("Nan on right-hand side.")
         dx = 1j*np.zeros((dof,m))
         for stageInd in range(m):
             dx[:,stageInd] = dxlong[dof*stageInd:dof*(stageInd+1)]
@@ -101,6 +95,91 @@ class CQModel:
             info = 0
         else:
             info = coeff*np.linalg.norm(dx)
+        return np.real(x1),grada,info
+
+    def fixedPointSolver(self,s,rhs,W0,Tdiag, x0,charMatrix0,tol = 10**(-8),coeff = 1):
+        dof = len(rhs)
+        m = len(W0)
+        Tinv = np.linalg.inv(Tdiag)
+        rhsLong = 1j*np.zeros(m*dof)
+        x1 = x0
+        counter = 0
+        while (np.linalg.norm(x1-x0)>10**(-5)) or (counter==0 ):
+            counter = counter+1
+            if counter >= 20:
+                break
+            x0 = x1
+            stageRHS = x0+1j*np.zeros((dof,m))
+            ## Calculating right-hand side
+            stageRHS = np.matmul(stageRHS,Tinv.T)
+            for stageInd in range(m):
+                stageRHS[:,stageInd] = self.harmonicForward(s,stageRHS[:,stageInd],precomp=W0[stageInd])
+            stageRHS = np.matmul(stageRHS,Tdiag.T)
+            rhsFP = rhs-self.nonlinearity(x0)
+            rhsFP = np.matmul(rhsFP,Tinv.T)
+            if np.isnan(rhsFP).any():
+                raise ValueError("Nan value occurs in right-hand side")
+            for stageInd in range(m):
+                rhsLong[stageInd*dof:(stageInd+1)*dof] = rhsFP[:,stageInd]
+            def FixPointFunc(xdummy):
+                ydummy = 1j*np.zeros(dof*m)
+                for j in range(m):  
+                    ydummy[j*dof:(j+1)*dof] = self.harmonicForward(s[j],xdummy[j*dof:(j+1)*dof],precomp = W0[j])
+                return ydummy
+            FPLambda = lambda x: FixPointFunc(x)
+            from scipy.sparse.linalg import LinearOperator
+            FPOperator = LinearOperator((m*dof,m*dof),FPLambda)
+            x1long,info = gmres(FPOperator,rhsLong,tol=1e-8)
+            if info != 0:
+                print("GMRES Info not zero, Info: ", info)
+                ## Calculating Matrix
+                FPMat = np.zeros((m*dof,m*dof))
+                Mid = np.identity(m*dof)
+                for k in range(m*dof):
+                    FPMat[:,k] = FixPointFunc(Mid[:,k])
+                print("Corresponding Matrix: ", FPMat, " Condition: ", np.linalg.cond(FPMat), " RHS : ",rhsLong)
+            x1 = 1j*np.zeros((dof,m))
+            for stageInd in range(m):
+                x1[:,stageInd] = x1long[dof*stageInd:dof*(stageInd+1)]
+            x1 = np.matmul(x1,Tdiag.T)  
+        if (np.linalg.norm(x1-x0)<=10**(-5)):
+            info = 0
+        else:
+            info = np.linalg.norm(x1-x0)
+        return np.real(x1),info
+
+    def reversefixedPointSolver(self,s,rhs,W0,Tdiag, x0,charMatrix0,tol = 10**(-8),coeff = 1):
+        dof = len(rhs)
+        m = len(W0)
+        Tinv = np.linalg.inv(Tdiag)
+        rhsLong = 1j*np.zeros(m*dof)
+        x1 = x0
+        counter = 0
+        #print("NEW SYSTEM!")
+        stageRHS = x0+1j*np.zeros((dof,m))
+        x0 = x0
+        while (np.linalg.norm(x1-x0)>10**(-8)) or (counter==0 ):
+            counter = counter+1
+            if counter >= 20:
+                break
+            x0 = x1
+            ## Calculating right-hand side
+            W0X0 = np.matmul(x0,Tinv.T)
+            for stageInd in range(m):
+                W0X0[:,stageInd] = self.harmonicForward(s,W0X0[:,stageInd],precomp=W0[stageInd])
+            W0X0 = np.matmul(W0X0,Tdiag.T)
+            rhsFP = rhs-W0X0
+            x1 = 1j*np.zeros((dof,m))
+            for stageInd in range(m):
+                x1[:,stageInd] = self.nonlinearityInverse(rhsFP[:,stageInd])
+            if np.linalg.norm(x1)>10**9:
+
+                return np.real(x1),10**9
+            #print("DISTANCE X1-X0 ",np.linalg.norm(x1-x0))
+        if (np.linalg.norm(x1-x0)<=10**(-5)) and not np.isnan(x1).any():
+            info = 0
+        else:
+            info = np.linalg.norm(x1-x0)
         return np.real(x1),info
 
     def createFFTLengths(self,N):
@@ -111,7 +190,6 @@ class CQModel:
             lengths.extend(lengths[:-1][::-1])
             it = it+1
         return lengths
-
     def extrapolCoefficients(self,p):
             coeffs = np.ones(p+1)
             for j in range(p+1):
@@ -129,10 +207,14 @@ class CQModel:
             extrU = extrU+gammas[j]*u[:,-p-1+j]
         return extrU
     
-    def simulate(self,T,N,dof,method = "RadauIIA-2"):
+    def simulate(self,T,N,method = "RadauIIA-2",tolsolver = 10**(-8)):
         tau = T*1.0/N
         ## Initializing right-hand side:
         lengths = self.createFFTLengths(N)
+        try:
+            dof = len(self.righthandside(0))
+        except:
+            dof = 1
         ## Actual solving:
         [A_RK,b_RK,c_RK,m] = self.tdForward.get_method_characteristics(method)
         charMatrix0 = np.linalg.inv(A_RK)/tau
@@ -157,34 +239,33 @@ class CQModel:
                     extr[:,i] = self.extrapol(sol[:,i+1:j*m+i+1:m],m+1)
                 else:
                     extr[:,i] = np.zeros(dof)
-            sol[:,j*m+1:(j+1)*m+1],info = self.newtonsolver(deltaEigs,rhs[:,j*m+1:(j+1)*m+1],W0,Tdiag,extr,charMatrix0)
-            if info >0:
-                sol[:,j*m+1:(j+1)*m+1],info = self.newtonsolver(deltaEigs,rhs[:,j*m+1:(j+1)*m+1],W0,Tdiag,sol[:,j*m+1:(j+1)*m+1],charMatrix0)  
-            if info >0:
-                sol[:,j*m+1:(j+1)*m+1],info = self.newtonsolver(deltaEigs,rhs[:,j*m+1:(j+1)*m+1],W0,Tdiag,sol[:,j*m+1:(j+1)*m+1],charMatrix0)
- 
-            print("Difference ", np.linalg.norm(extr-sol[:,j*m+1:(j+1)*m+1]))
-            if info >10**(-5):
-                sol[:,j*m+1:(j+1)*m+1] = extr
-                print("Use weighted Newton-method")
-            else :
-                info = 0
-            ## Additional Newton iterations:
+            ############## SOLVING NONLINEAR SYSTEM########################
+   #         ### Try 1: reverse fixed Point iteration:
+   #         sol[:,j*m+1:(j+1)*m+1],info = self.reversefixedPointSolver(deltaEigs,rhs[:,j*m+1:(j+1)*m+1],W0,Tdiag,extr,charMatrix0)
+   #         if info <=tolsolver:
+   #             print("Used REVERSE Fix Point!")
+   #         ### Try 2: forward fixed Point iteration:
+   #        # if info >tolsolver:
+   #        #     sol[:,j*m+1:(j+1)*m+1],info = self.fixedPointSolver(deltaEigs,rhs[:,j*m+1:(j+1)*m+1],W0,Tdiag,extr,charMatrix0)
+   #        # if info >tolsolver:
+   #        #     print("Both fixed point failed. info: "+str(info))
+   #         ### Try 3: Classical Newton's method, 4 iterations
+   #         sol[:,j*m+1:(j+1)*m+1] = extr
+   #         for it in range(4):
+   #             if info >tolsolver:
+   #                 sol[:,j*m+1:(j+1)*m+1],info = self.newtonsolver(deltaEigs,rhs[:,j*m+1:(j+1)*m+1],W0,Tdiag,extr,charMatrix0)
+   #         if info <=tolsolver:
+   #             print("Used classical Newton!")
 
+   #         ###  Use simplified Weighted Newon's method ######
+            sol[:,j*m+1:(j+1)*m+1] = extr
+            sol[:,j*m+1:(j+1)*m+1],grada,info = self.newtonsolver(deltaEigs,rhs[:,j*m+1:(j+1)*m+1],W0,Tdiag,sol[:,j*m+1:(j+1)*m+1],charMatrix0)
             counter = 0
             while info >0:
-                sol[:,j*m+1:(j+1)*m+1],info = self.newtonsolver(deltaEigs,rhs[:,j*m+1:(j+1)*m+1],W0,Tdiag,sol[:,j*m+1:(j+1)*m+1],charMatrix0,coeff=0.8**counter)
-           #     print("Info: ",info)
-                counter = counter+1
-           #     if counter >20:
-           #         print("Newton method not converged, last dx norm was ",info)
-           #         sol[:,j*m+1:(j+1)*m+1],info = self.newtonsolver(deltaEigs,rhs[:,j*m+1:(j+1)*m+1],W0,Tdiag,extr,charMatrix0,coeff = 0.5)
-           #         counter = 1
-           #         while info >10**(-7):
-           #             sol[:,j*m+1:(j+1)*m+1],info = self.newtonsolver(deltaEigs,rhs[:,j*m+1:(j+1)*m+1],W0,Tdiag,sol[:,j*m+1:(j+1)*m+1],charMatrix0, coeff = 0.5**counter)
-           #         break
-            #print("Newton needed ",counter, " iterations. Last dx norm was ", info)
-            #sol[:,j*m+1:(j+1)*m+1] = np.real(self.newtonsolver(deltaEigs,rhs[:,j*m+1:(j+1)*m+1],W0,Tdiag,sol[:,j*m+1:(j+1)*m+1],charMatrix0))
+                    sol[:,j*m+1:(j+1)*m+1],grada,info = self.newtonsolver(deltaEigs,rhs[:,j*m+1:(j+1)*m+1],W0,Tdiag,sol[:,j*m+1:(j+1)*m+1],charMatrix0,grada=grada,coeff=0.5**counter)
+                    counter = counter+1
+
+            ## Solving Completed #####################################
             ## Calculating Local History:
             currLen = lengths[j]
             localHist = np.concatenate((sol[:,m*(j+1)+1-m*currLen:m*(j+1)+1],np.zeros((dof,m*currLen))),axis=1)

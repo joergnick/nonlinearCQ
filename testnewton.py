@@ -32,7 +32,7 @@ for j in range(Am):
 	#ex_sol = 4*3*tt**2
 	#method = "BDF-"+str(m)
 	method = "RadauIIA-"+str(m)
-	sol = model.simulate(T,N,2,method = method)
+	sol = model.simulate(T,N,method = method)
 
 	#err[j] = np.abs(sol[0,2]-tau**3)
 	#print(err)
