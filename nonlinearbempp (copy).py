@@ -2,7 +2,7 @@ import numpy as np
 import bempp.api
 import inspect
 import matplotlib.pyplot as plt
-dx = 0.3
+dx = 0.6
 grid = bempp.api.shapes.sphere(h=dx)
 RT_space = bempp.api.function_space(grid,"RT",0)
 #def incident_field(x,n,domain_index,result):
@@ -33,7 +33,7 @@ def getCoefftoEval(space):
 	verticedataSize = len(evalvertices[0,:])*3
 	#print(centerdata.shape)
 	#print(centerdataSize)
-	CoeffToEval = np.zeros((centerdataSize+verticedataSize,dof))
+	CoeffToEval = np.zeros((centerdataSize+3,dof))
 	coefficients = np.ones(dof)*0
 	for j in range(dof):
 		coefficients[j] = 1
@@ -41,7 +41,7 @@ def getCoefftoEval(space):
 		evalcenters = trace_fun.evaluate_on_element_centers()
 		CoeffToEval[:centerdataSize,j] = np.ravel(evalcenters)
 		evalvertices = trace_fun.evaluate_on_vertices()
-		CoeffToEval[centerdataSize:,j] = np.ravel(evalvertices)
+		CoeffToEval[centerdataSize:,j] = np.ravel(evalvertices[:,0])
 		coefficients[j] = 0
 	return CoeffToEval
 dof = RT_space.global_dof_count
@@ -54,14 +54,14 @@ for j in range(len(centerEvalsGiven[0,:])):
 for j in range(len(verticeEvalsGiven[0,:])):
 	verticeEvalsGiven[:,j] = a(verticeEvalsGiven[:,j])
 
-evalDataFlat = np.concatenate((np.ravel(centerEvalsGiven),np.ravel(verticeEvalsGiven)),axis = 0)
+evalDataFlat = np.concatenate((np.ravel(centerEvalsGiven),np.ravel(verticeEvalsGiven[:,0])),axis = 0)
 
 #print(np.linalg.norm(CoeffToEval.dot(coefficientsGiven)-evalDataFlat))
 coeffa,res,rank,s = np.linalg.lstsq(CoeffToEval,evalDataFlat)
 print(rank,RT_space.global_dof_count)
 print(res)
 lstsqfun = bempp.api.GridFunction(RT_space, coefficients = coeffa, dual_space = RT_space)
-print((lstsqfun-trace_fun2).l2_norm())
+#print((lstsqfun-trace_fun2).l2_norm())
 #print((np.linalg.norm(coefficientsSearched-coeffa))/np.linalg.norm(coefficientsSearched))
 #print(coeffa)
 #print(np.linalg.norm(CoeffToEval.dot(coeffa)-evalDataFlat))
