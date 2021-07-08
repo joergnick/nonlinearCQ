@@ -17,9 +17,19 @@ def a(x):
 #        result[:] = np.cross(curlU , n)
 #print(inspect.getsource(bempp.api.GridFunction.from_random))
 dof = RT_space.global_dof_count
-samples = dof
-cMat = np.zeros((dof,dof))
-for j in range(samples):
-	cMat[j,:] = bempp.api.GridFunction.from_random(RT_space).coefficients
-E = np.linalg.eigvals(cMat)
-print(np.sort(np.abs(E)))
+#samples = dof
+#cMat = np.zeros((dof,dof))
+#for j in range(samples):
+#	cMat[j,:] = bempp.api.GridFunction.from_random(RT_space).coefficients
+#
+#E = np.linalg.eigvals(cMat)
+#print(np.sort(np.abs(E)))
+
+coefficients = np.zeros(dof)
+coefficients[0] = 1
+coefficients[1] = 1
+trace_fun= bempp.api.GridFunction(RT_space, coefficients = coefficients)
+print(trace_fun.evaluate_on_vertices())
+#print(trace_fun.evaluate_on_element_centers())
+print(len(trace_fun.evaluate_on_vertices()[0,:]))
+trace_fun.plot()

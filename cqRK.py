@@ -232,6 +232,7 @@ class CQModel:
         for j in range(0,N):
             ## Calculating solution at timepoint tj
             tj       = tau*j
+	    print(j)
             #print("NEW STEP : ",j, "ex_ sol: ",[(tj+c*tau)**3 for c in c_RK])
             for i in range(m):
                 rhs[:,j*m+i+1] = rhs[:,j*m+i+1] + self.righthandside(tj+c_RK[i]*tau,history=sol[:,:j*m])

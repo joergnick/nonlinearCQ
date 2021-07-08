@@ -12,7 +12,7 @@ class ScatModel(CQModel):
 	
 model = ScatModel()
 T = 1
-Am = 4
+Am = 1
 m=3
 import numpy as np
 taus = np.zeros(Am)
@@ -21,7 +21,7 @@ Ns  = np.zeros(Am)
 comp = np.zeros(Am)
 #print(np.kron(np.array([[1,2],[3,4]]),np.identity(3)))
 for j in range(Am):
-	N = 8*2**j
+	N = 2**14*2**j
 	#N = 2*(2*2**j-1)
 	Ns[j] = N
 	tau = T*1.0/N
