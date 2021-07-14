@@ -60,6 +60,7 @@ import inspect
 print(inspect.getsource(bempp.api.GridFunction))
 dx = 1
 grid = bempp.api.shapes.sphere(h=dx)
+
 RT_space = bempp.api.function_space(grid,"RT",0)
 identity2=bempp.api.operators.boundary.sparse.identity(RT_space, RT_space, RT_space)
 import inspect
