@@ -26,6 +26,8 @@ dof = RT_space.global_dof_count
 coeffs = np.zeros(dof)
 coeffs[0] = 1
 one_grid = bempp.api.GridFunction(RT_space,coefficients = coeffs)
+coeffs[0] = 0
+coeffs[1] = 1
 two_grid = bempp.api.GridFunction(RT_space,coefficients = coeffs)
 
 ## START INTEGRATION
@@ -33,8 +35,10 @@ from bempp.api.integration import gauss_triangle_points_and_weights
 import numpy as np
 
 components = one_grid.component_count
-res = np.zeros((components, 1), dtype='float64')
+#res = np.zeros((components, 1), dtype='float64')
+res = 0
 accuracy_order = one_grid.parameters.quadrature.far.single_order
+accuracy_order = 5
 points, weights = gauss_triangle_points_and_weights(accuracy_order)
 ## Additional line:
 element = None
@@ -45,26 +49,27 @@ element_list = [element] if element is not None else list(
 #print(element_list[0].geometry.local2global(points))
 #print(inspect.getsource(element_list[0].geometry.local2global))
 
-
 for element in element_list:
     integration_elements = element.geometry.integration_elements(
         points)
-    print("HI,points: ",points, " evals: ",one_grid.evaluate(element, points))
-    res += np.sum(
-        np.dot(one_grid.evaluate(element, points).T,two_grid.evaluate(element, points))*weights * integration_elements,
-        axis=1)
+    A = one_grid.evaluate(element, points)
+    B = two_grid.evaluate(element, points)
+    res += sum([A[:,i].dot(B[:,i])*weights[i]*integration_elements[i] for i in range(len(A[0,:]))] ) 
+    #res += np.sum(np.matmul(one_grid.evaluate(element, points).T,two_grid.evaluate(element, points))*weights * integration_elements,
+    #    axis=1)
+
 
 
 print(res)
 ## END INTEGRATION
-print(one_grid.integrate())
+#print(one_grid.integrate())
 center_evals = one_grid.evaluate_on_element_centers()
 #print(len(center_evals[0,:]))
 identity = bempp.api.operators.boundary.sparse.identity(RT_space, RT_space, RT_space)
 id_weak = identity.weak_form()
 id_sparse = aslinearoperator(id_weak).sparse_operator
 id_dense = id_sparse.A
-print(id_dense[0,0])
+print(id_dense[0,1])
 import matplotlib.pyplot as plt
 
 #print(id_dense)
