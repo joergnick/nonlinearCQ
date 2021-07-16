@@ -22,22 +22,37 @@ grid = bempp.api.shapes.sphere(h=0.5)
 
 
 RT_space = bempp.api.function_space(grid,"RT",0)
+
 def precompMM(space):
     nontrivialEntries = []
     dof = space.global_dof_count
     #for j in range
     import numpy as np
     import bempp.api 
+    coeffs = np.zeros(dof)
+    element_list =  list(space.grid.leaf_view.entity_iterator(0))
+    gridfunList = []
+    domainList = [[] for _ in element_list]
+    domainDict = dict(zip(element_list,[[] for _ in element_list]))
+    for j in range(dof):
+        coeffs[j] = 1
+        gridfun = bempp.api.GridFunction(space,coefficients = coeffs)
+        gridfunList.append(gridfun)
+        indices = np.nonzero(np.sum(gridfun.evaluate_on_element_centers()**2,axis = 0))
+       # print(gridfun.evaluate(element_list[indices[0][0]],np.array([[0.5],[0.5]])))
+       # print(gridfun.evaluate(element_list[indices[0][1]],np.array([[0.5],[0.5]])))
+        domainList[indices[0][0]].append(j)
+        domainList[indices[0][1]].append(j)
+        domainDict[element_list[indices[0][0]]].append(j)
+        domainDict[element_list[indices[0][1]]].append(j)
+        coeffs[j] = 0
     identity = bempp.api.operators.boundary.sparse.identity(space,space,space)
+         
     id_weak = identity.weak_form()
     id_sparse = aslinearoperator(id_weak).sparse_operator
-    return id_sparse
-#print(dir(precompMM(RT_space)))
-#print(precompMM(RT_space))
-#print(precompMM(RT_space).indices)
-#print(precompMM(RT_space).indptr)
-#print(len(precompMM(RT_space).indices))
-#print(len(precompMM(RT_space).indptr))
+    neighborlist = id_sparse.tolil().rows
+    return gridfunList,neighborlist,domainDict
+
 space = RT_space
 identity = bempp.api.operators.boundary.sparse.identity(space,space,space)
 id_weak = identity.weak_form()
@@ -46,13 +61,8 @@ M = id_sparse.A
 def massMatrix(space):
     dof = space.global_dof_count
     import numpy as np
-    coeffs = np.zeros(dof)
-    gridfunList = []
-    for j in range(dof):
-        coeffs[j] = 1
-        gridfunList.append(bempp.api.GridFunction(space,coefficients = coeffs))
-        coeffs[j] = 0
     from bempp.api.integration import gauss_triangle_points_and_weights
+    gridfunList,neighborlist,domainDict = precompMM(space)
     accuracy_order = gridfunList[0].parameters.quadrature.far.single_order
     points, weights = gauss_triangle_points_and_weights(accuracy_order)
     element = None
@@ -60,16 +70,11 @@ def massMatrix(space):
     element_list = [element] if element is not None else list(
     gridfunList[0].grid.leaf_view.entity_iterator(0))
     massdense = np.zeros((dof,dof))
-    identity = bempp.api.operators.boundary.sparse.identity(RT_space, RT_space, RT_space)
-    id_weak = identity.weak_form()
-    id_sparse = aslinearoperator(id_weak).sparse_operator
-    id_dense = id_sparse.A   
-    neighborlist = precompMM(RT_space).tolil().rows
     #print(len(gridfunList[0].evaluate_on_element_centers()[0,:]))
     for element in element_list:
         integration_elements = element.geometry.integration_elements(points)
-        for i in range(dof):
-            for j in neighborlist[i]:
+        for i in domainDict[element]:
+            for j in domainDict[element]:
                 A = gridfunList[i].evaluate(element, points)
                 B = gridfunList[j].evaluate(element, points)
                 massdense[i,j] += sum([A[:,k].dot(B[:,k])*weights[k]*integration_elements[k] for k in range(len(A[0,:]))] ) 
