@@ -1,4 +1,4 @@
-from cqRK import CQModel
+from cqtoolbox import CQModel
 import numpy as np
 class ScatModel(CQModel):
     def precomputing(self,s):
