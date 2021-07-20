@@ -27,7 +27,6 @@ def precompMM(space):
     dof = space.global_dof_count
     #for j in rang*1.0e
     import numpy as np
-    import bempp.api 
     coeffs = np.zeros(dof)
     element_list =  list(space.grid.leaf_view.entity_iterator(0))
     gridfunList = []
@@ -38,15 +37,12 @@ def precompMM(space):
         gridfun = bempp.api.GridFunction(space,coefficients = coeffs)
         gridfunList.append(gridfun)
         indices = np.nonzero(np.sum(gridfun.evaluate_on_element_centers()**2,axis = 0))
-       # print(gridfun.evaluate(element_list[indices[0][0]],np.array([[0.5],[0.5]])))
-       # print(gridfun.evaluate(element_list[indices[0][1]],np.array([[0.5],[0.5]])))
         domainList[indices[0][0]].append(j)
         domainList[indices[0][1]].append(j)
         domainDict[element_list[indices[0][0]]].append(j)
         domainDict[element_list[indices[0][1]]].append(j)
         coeffs[j] = 0
     identity = bempp.api.operators.boundary.sparse.identity(space,space,space)
-         
     id_weak = identity.weak_form()
     id_sparse = aslinearoperator(id_weak).sparse_operator
     neighborlist = id_sparse.tolil().rows
@@ -65,7 +61,6 @@ def sparseWeightedMM(space,weightGF,Da,gridfunList,neighborlist,domainDict):
     row  = []
     col  = []
     massdense = np.zeros((dof,dof))
-
     for element in element_list:
         integration_elements = element.geometry.integration_elements(points)
         for i in domainDict[element]:
@@ -153,7 +148,7 @@ start = time.time()
 gridfunList,neighborlist,domainDict    = precompMM(RT_space)
 precomptime = time.time()
 def a(x):
-    return np.linalg.norm(x)*x
+    return np.linalg.norm(x)**(-0.5)*x
 def tangential_trace(x, n, domain_index, result):
         result[:] = np.cross(n,np.cross(np.array([np.exp(-1*(x[2])), 0. * x[2], 0. * x[2]]), n))
 def atang_trace(x,n,domain_index,result):
@@ -163,7 +158,8 @@ trace_fun  = bempp.api.GridFunction(RT_space, fun=tangential_trace,dual_space=RT
 exatrace_fun  = bempp.api.GridFunction(RT_space, fun=atang_trace,dual_space=RT_space)
 
 approxatrace_fun = applyNonlinearity(trace_fun,a,gridfunList,domainDict)
-(approxatrace_fun-exatrace_fun).plot()
+exatrace_fun.plot()
+#(approxatrace_fun-exatrace_fun).plot()
 print("DIFFERENCE IN GRIDFUNCTIONS: ",(exatrace_fun-approxatrace_fun).l2_norm())
 #print("Precomputing time: ",precomptime-start)
 M = massMatrix(RT_space,gridfunList,neighborlist,domainDict)
