@@ -21,11 +21,9 @@ grid = bempp.api.shapes.sphere(h=0.5)
 #print(dict(grid))
 
 RT_space = bempp.api.function_space(grid,"RT",0)
-
 def precompMM(space):
     nontrivialEntries = []
     dof = space.global_dof_count
-    #for j in rang*1.0e
     import numpy as np
     coeffs = np.zeros(dof)
     element_list =  list(space.grid.leaf_view.entity_iterator(0))
