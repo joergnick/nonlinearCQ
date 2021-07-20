@@ -146,7 +146,8 @@ start = time.time()
 gridfunList,neighborlist,domainDict    = precompMM(RT_space)
 precomptime = time.time()
 def a(x):
-    return np.linalg.norm(x)**(-0.5)*x
+    return np.linalg.norm(x)**2*x
+    #return np.linalg.norm(x)**(-0.5)*x
 def tangential_trace(x, n, domain_index, result):
         result[:] = np.cross(n,np.cross(np.array([np.exp(-1*(x[2])), 0. * x[2], 0. * x[2]]), n))
 def atang_trace(x,n,domain_index,result):
