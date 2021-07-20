@@ -54,18 +54,17 @@ RT_space = bempp.api.function_space(grid,"RT",0)
 gridfunList,neighborlist,domainDict    = precompMM(RT_space)
 def a(x):
     return np.linalg.norm(x)**2*x
-def tangential_trace(x, n, domain_index, result):
+def u(x, n, domain_index, result):
         result[:] = np.cross(n,np.cross(np.array([np.exp(-1*(x[2])), 0. * x[2], 0. * x[2]]), n))
 
-trace_fun  = bempp.api.GridFunction(RT_space, fun=tangential_trace,dual_space=RT_space)
-
+u_gridFun  = bempp.api.GridFunction(RT_space, fun=tangential_trace,dual_space=RT_space)
+a_of_u_gridFun = applyNonlinearity(trace_fun,a,gridfunList,domainDict)
 
 def atang_trace(x,n,domain_index,result):
     result[:] = a(np.cross(n,np.cross(np.array([np.exp(-1*(x[2])), 0. * x[2], 0. * x[2]]), n)))
 
 exatrace_fun  = bempp.api.GridFunction(RT_space, fun=atang_trace,dual_space=RT_space)
 
-approxatrace_fun = applyNonlinearity(trace_fun,a,gridfunList,domainDict)
 exatrace_fun.plot()
 
 
