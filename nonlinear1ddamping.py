@@ -1,4 +1,5 @@
 from cqtoolbox import CQModel
+import math
 import numpy as np
 class ScatModel(CQModel):
     def precomputing(self,s):
@@ -9,19 +10,28 @@ class ScatModel(CQModel):
         return precomp.dot(b)
     def righthandside(self,t,history = None):
         #return 1.0/4*t**4+10000*t**9
-        return [5*t**4+t**(2.5), 2.0/6*t**6+t**(2.5)]
+        return [5*t**4+2**(-0.25)*t**(2.5), 2.0/6*t**6+2**(-0.25)*t**(2.5)]
         #return 5*t**4+t**(2.5)
         #return 1.0/6*t**6+t**2.5
     def nonlinearity(self,x):
     #   print("X IN NONLINEARITY: ",x," RESULT : ",abs(x)**(-0.5)*x)
         #val = 10000*x**3
-        val = np.abs(x)**(-0.5)*x
+        val = np.linalg.norm(x)**(-0.5)*x
+        #val = np.abs(x)**(-0.5)*x
         #val = np.linalg.norm(x)**(-0.5)*x
         #val = np.linalg.norm(x)**(-0.5)*x
         #val = np.linalg.norm(x)**(-0.5)*x
         nanindizes = np.isnan(val)  
         val[nanindizes] = 0
         return val
+    def customGradient(self,m,dof,x0):
+        raise NotImplementedError("Hi")
+       # gradList = []
+       # for stageInd in range(m):
+       #     x= x0[:,stageInd]
+       #     grad = -0.5*np.linalg.norm(x)**(-2.5)*np.outer(x,x)+np.linalg.norm(x)**(-0.5)*np.eye(3)
+       #     gradList.append(grad)
+       # return gradList
     def nonlinearityInverse(self,x):
         #val = np.linalg.norm(x)**(1)*x
         val = np.abs(x)**(1)*x
@@ -32,7 +42,7 @@ class ScatModel(CQModel):
 model = ScatModel()
 #print(model.nonlinearity(model.nonlinearityInverse(np.array([-12312,123123]))))
 T     = 1
-Am    = 4
+Am    = 5
 m     = 2
 taus = np.zeros(Am)
 err1 = np.zeros(Am)
@@ -68,15 +78,17 @@ for j in range(Am):
 print(err1)
 print(err2)
 ##print(sol)
-#import matplotlib.pyplot as plt
+import matplotlib.pyplot as plt
 #plt.plot(sol[0,::m])
 #plt.plot(sol[1,::m])
 #plt.plot(ex_sol,linestyle='dashed')
 #plt.show()
 ##
-import matplotlib.pyplot as plt
+
 plt.loglog(taus,err1)
 plt.loglog(taus,err2)
+
+plt.loglog(taus,taus**1,linestyle = 'dashed')
 plt.loglog(taus,taus**2,linestyle = 'dashed')
 plt.loglog(taus,taus**3,linestyle = 'dashed')
 plt.show()

@@ -1,6 +1,6 @@
 import unittest
 import numpy as np
-from cqRK import CQModel
+from cqtoolbox import CQModel
 
 class ScatModel(CQModel):
 	def precomputing(self,s):

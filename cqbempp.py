@@ -58,9 +58,6 @@ bempp.api.global_parameters.hmat.admissibility='strong'
 model = ScatModel()
 sol   = model.simulate(4,30,method = "RadauIIA-2")
 
-import matplotlib.pyplot as plt
-plt.plot(sol[0,:])
-plt.show()
 
 
 #def harmonic_calderon(s,b,grid):
