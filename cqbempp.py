@@ -1,4 +1,5 @@
 from cqtoolbox import CQModel
+from customOperators import *
 import bempp.api
 import numpy as np
 grid = bempp.api.shapes.sphere(h=1)
