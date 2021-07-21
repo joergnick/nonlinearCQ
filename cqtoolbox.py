@@ -10,7 +10,6 @@ class CQModel:
         self.countEv = 0
     def time_step(self,s0,t,history,conv_history,x0):
         raise NotImplementedError("No time stepping given.") 
-        	
         ## Methods supplied by user:
     def nonlinearity(self,x):
         raise NotImplementedError("No nonlinearity given.")
@@ -48,7 +47,7 @@ class CQModel:
                     grada[stageInd*dof:(stageInd+1)*dof,stageInd*dof+i] = diff/(2*taugrad)
             return grada 
 
-    def newtonsolver(self,s,rhs,W0,Tdiag, x0,charMatrix0,tol = 10**(-8),coeff = 1,grada = None):
+    def newtonsolver(self,s,rhs,W0,Tdiag, x0,charMatrix0,tol = 10**(-3),coeff = 1,grada = None):
         dof = len(rhs)
         m = len(W0)
         for stageInd in range(m):
@@ -61,6 +60,7 @@ class CQModel:
             grada = self.discreteGradient(m,dof,x0)
         stageRHS = x0+1j*np.zeros((dof,m))
         ## Calculating right-hand side
+
         stageRHS = np.matmul(stageRHS,Tinv.T)
         for stageInd in range(m):
             stageRHS[:,stageInd] = self.harmonicForward(s,stageRHS[:,stageInd],precomp=W0[stageInd])
@@ -80,7 +80,7 @@ class CQModel:
             ydummy = 1j*np.zeros(dof*m)
             for j in range(m):  
                 ydummy[j*dof:(j+1)*dof] = self.harmonicForward(s[j],xdummy[j*dof:(j+1)*dof],precomp = W0[j])
-            ydummy = ydummy+np.matmul(np.matmul(Tdiagdof,grada),Tinvdof).dot(xdummy)
+            ydummy = ydummy+Tdiagdof.dot(grada.dot(Tinvdof.dot(xdummy)))
             return ydummy
         NewtonLambda = lambda x: NewtonFunc(x)
         from scipy.sparse.linalg import LinearOperator
@@ -99,6 +99,7 @@ class CQModel:
             dx[:,stageInd] = dxlong[dof*stageInd:dof*(stageInd+1)]
         dx = np.matmul(dx,Tdiag.T)  
         x1 = x0-coeff*dx
+        #print("RESIDUUM: ",np.linalg.norm(dx))
         if coeff*np.linalg.norm(dx)<tol:
             info = 0
         else:
@@ -154,22 +155,22 @@ class CQModel:
         extr = np.zeros((dof,m))
         for j in range(0,N):
             ## Calculating solution at timepoint tj
-
             tj       = tau*j
-            #print("NEW STEP : ",j, "ex_ sol: ",[(tj+c*tau)**3 for c in c_RK])
+            print("NEW STEP : ",j)
             for i in range(m):
                 rhs[:,j*m+i+1] = rhs[:,j*m+i+1] + self.righthandside(tj+c_RK[i]*tau,history=sol[:,:j*m])
                 if j >=1:
-                    extr[:,i] = self.extrapol(sol[:,i+1:j*m+i+1:m],m+1)
+                    extr[:,i] = self.extrapol(sol[:,i+1:j*m+i+1:m],m)
                 else:
                     extr[:,i] = np.zeros(dof)
    #         ###  Use simplified Weighted Newon's method ######
             sol[:,j*m+1:(j+1)*m+1] = extr
-            sol[:,j*m+1:(j+1)*m+1],grada,info = self.newtonsolver(deltaEigs,rhs[:,j*m+1:(j+1)*m+1],W0,Tdiag,sol[:,j*m+1:(j+1)*m+1],charMatrix0)
-            counter = 0
-            while info >0:
-                    sol[:,j*m+1:(j+1)*m+1],grada,info = self.newtonsolver(deltaEigs,rhs[:,j*m+1:(j+1)*m+1],W0,Tdiag,sol[:,j*m+1:(j+1)*m+1],charMatrix0,grada=grada,coeff=0.5**counter)
-                    counter = counter+1
+            sol[:,j*m+1:(j+1)*m+1],grada,info = self.newtonsolver(deltaEigs,rhs[:,j*m+1:(j+1)*m+1],W0,Tdiag,sol[:,j*m+1:(j+1)*m+1],charMatrix0,grada = np.zeros((2*dof,2*dof)))
+            print("Extrapolation-sol : ",np.linalg.norm(sol[:,j*m+1:(j+1)*m+1]-extr))
+           #counter = 0
+           # while info >0:
+           #         sol[:,j*m+1:(j+1)*m+1],grada,info = self.newtonsolver(deltaEigs,rhs[:,j*m+1:(j+1)*m+1],W0,Tdiag,sol[:,j*m+1:(j+1)*m+1],charMatrix0,grada=grada,coeff=0.5**counter)
+           #         counter = counter+1
 
             ## Solving Completed #####################################
             ## Calculating Local History:

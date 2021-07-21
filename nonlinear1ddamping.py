@@ -66,6 +66,7 @@ for j in range(Am):
 #    plt.semilogy(ex_sol,linestyle='dashed')
 #    plt.show()
 print(err1)
+print(err2)
 ##print(sol)
 #import matplotlib.pyplot as plt
 #plt.plot(sol[0,::m])
