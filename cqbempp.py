@@ -1,9 +1,11 @@
 from cqtoolbox import CQModel
-from customOperators import *
+from customOperators import precompMM,sparseWeightedMM,applyNonlinearity
 import bempp.api
 import numpy as np
 grid = bempp.api.shapes.sphere(h=1)
 RT_space=bempp.api.function_space(grid, "RT",0)
+
+gridfunList,neighborlist,domainDict = precompMM(RT_space)
 id_op=bempp.api.operators.boundary.sparse.identity(RT_space, RT_space, RT_space)
 id_weak = id_op.weak_form()
 class ScatModel(CQModel):
@@ -23,7 +25,15 @@ class ScatModel(CQModel):
     def harmonicForward(self,s,b,precomp = None):
             BemppBlocks=bempp.api.BlockedDiscreteOperator(precomp[0])
             return BemppBlocks*b
+    def calcGradient(self,x):
+        weightGF = bempp.api.GridFunction(RT_space,coefficients = x)
+        sparseWeightedMM(RT_space,weightGF,Da,gridfunList,neighborlist,domainDict)
+            return np.eye(len(x))
+    def applyGradient(self,b, grad = grad):
+            return grad.dot(b)
+
     def nonlinearity(self,x):
+        applyNonlinearity(gridFun,a,gridfunList,domainDict)
         return 0
 
     def righthandside(self,t,history=None):
@@ -57,7 +67,9 @@ bempp.api.global_parameters.hmat.admissibility='strong'
 
 model = ScatModel()
 sol   = model.simulate(4,30,method = "RadauIIA-2")
-
+import matplotlib.pyplot as plt
+plt.plot(sol[0,:])
+plt.show()
 
 
 #def harmonic_calderon(s,b,grid):

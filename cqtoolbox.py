@@ -19,8 +19,10 @@ class CQModel:
         raise NotImplementedError("No time-harmonic forward operator given.")
     def harmonicBackward(self,s,b,precomp = None):
         raise NotImplementedError("No time-harmonic backward operator given.")
-    def customGradient(self,x):
+    def calcGradient(self,x):
         raise NotImplementedError("No gradient given.")
+    def applyGradient(self,b,grad=None):
+        raise NotImplementedError("Gradient has no applyGradient method.") 
     def righthandside(self,t,history=None):
         return 0
         #raise NotImplementedError("No right-hand side given.")
@@ -61,10 +63,10 @@ class CQModel:
                     x0[j,stageInd] = 10**(-5)
         Tinv = np.linalg.inv(Tdiag)
         rhsLong = 1j*np.zeros(m*dof)
-        if gradList is None:
+        print("x0 Shape",x0.shape)
             try:
-                gradList = self.customGradient(m,dof,x0)
-            except:
+                gradList = [self.calcGradient(x0[:,k]) for k in range(m)]
+            except NotImplementedError:
                 gradList = self.discreteGradient(m,dof,x0)
         stageRHS = x0+1j*np.zeros((dof,m))
         ## Calculating right-hand side

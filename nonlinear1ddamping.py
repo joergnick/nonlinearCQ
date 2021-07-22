@@ -24,14 +24,14 @@ class ScatModel(CQModel):
         nanindizes = np.isnan(val)  
         val[nanindizes] = 0
         return val
-    def customGradient(self,m,dof,x0):
-        raise NotImplementedError("Hi")
+    def calcGradient(self,x):
        # gradList = []
        # for stageInd in range(m):
        #     x= x0[:,stageInd]
-       #     grad = -0.5*np.linalg.norm(x)**(-2.5)*np.outer(x,x)+np.linalg.norm(x)**(-0.5)*np.eye(3)
+       #     grad = -0.5*np.linalg.norm(x)**(-2.5)*np.outer(x,x)+np.linalg.norm(x)**(-0.5)*np.eye(2)
        #     gradList.append(grad)
-       # return gradList
+        return -0.5*np.linalg.norm(x)**(-2.5)*np.outer(x,x)+np.linalg.norm(x)**(-0.5)*np.eye(2)
+       # raise NotImplementedError("Hi")
     def nonlinearityInverse(self,x):
         #val = np.linalg.norm(x)**(1)*x
         val = np.abs(x)**(1)*x
@@ -41,9 +41,9 @@ class ScatModel(CQModel):
 
 model = ScatModel()
 #print(model.nonlinearity(model.nonlinearityInverse(np.array([-12312,123123]))))
-T     = 1
-Am    = 5
-m     = 2
+T  = 1
+Am = 5
+m  = 2
 taus = np.zeros(Am)
 err1 = np.zeros(Am)
 err2 = np.zeros(Am)
