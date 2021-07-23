@@ -54,14 +54,14 @@ class CQModel:
             jacobList[stageInd] = jacoba
         return jacobList
 
-    def newtonsolver(self,s,rhs,W0,Tdiag, x0,charMatrix0,tolsolver = 10**(-4),coeff = 1):
+    def newtonsolver(self,deltaEigs,rhs,W0,Tdiag, x0,tolsolver = 10**(-8),debugmode=False,coeff = 1):
         x0pure = x0
         dof = len(rhs)
         m = len(W0)
-       # for stageInd in range(m):
-       #     for j in range(dof):
-       #         if np.abs(x0[j,stageInd])<10**(-5):
-       #             x0[j,stageInd] = 10**(-5)
+        for stageInd in range(m):
+            for j in range(dof):
+                if np.abs(x0[j,stageInd])<10**(-5):
+                    x0[j,stageInd] = 10**(-5)
         Tinv = np.linalg.inv(Tdiag)
         try:
             jacobList = [self.calcJacobian(x0[:,k]) for k in range(m)]
@@ -71,7 +71,7 @@ class CQModel:
         ## Calculating right-hand side
         stageRHS = np.matmul(stageRHS,Tinv.T)
         for stageInd in range(m):
-            stageRHS[:,stageInd] = self.harmonicForward(s,stageRHS[:,stageInd],precomp=W0[stageInd])
+            stageRHS[:,stageInd] = self.harmonicForward(deltaEigs[stageInd],stageRHS[:,stageInd],precomp=W0[stageInd])
         stageRHS = np.matmul(stageRHS,Tdiag.T)
         #rhsNewton = [stageRHS[:,k]+self.nonlinearity(x0[:,k])-rhs[:,k] for k in range(m)]
         ax0 = np.zeros((dof,m))
@@ -92,7 +92,7 @@ class CQModel:
             ydummy = 1j*np.zeros(dof*m)
             Txdummy = Tinvdof.dot(xdummy)
             for j in range(m):  
-                ydummy[j*dof:(j+1)*dof] = self.harmonicForward(s[j],xdummy[j*dof:(j+1)*dof],precomp = W0[j])
+                ydummy[j*dof:(j+1)*dof] = self.harmonicForward(deltaEigs[j],xdummy[j*dof:(j+1)*dof],precomp = W0[j])
                 Txdummy[j*dof:(j+1)*dof] =self.applyJacobian(jacobList[j],Txdummy[j*dof:(j+1)*dof])
             ydummy = ydummy+Tdiagdof.dot(Txdummy)
             return ydummy
@@ -106,6 +106,7 @@ class CQModel:
        # print(np.linalg.norm(dxlong-x0pureLong))
        # end1 = time.time()
         dxlong,info = gmres(NewtonOperator,rhsLong,restart = 2*dof,maxiter = 2*dof,x0=x0pureLong,tol=1e-6)
+        print("dxlong-x0pureLong: ",np.linalg.norm(dxlong-x0pureLong))
        # print(np.linalg.norm(dxlong-x0pureLong))
        # end2 = time.time()
        # print("With value: ",end2-end1, "Without value: ",end1-start)
@@ -154,7 +155,7 @@ class CQModel:
             extrU = extrU+gammas[j]*u[:,-p-1+j]
         return extrU
     
-    def simulate(self,T,N,method = "RadauIIA-2",tolsolver = 10**(-5)):
+    def simulate(self,T,N,method = "RadauIIA-2",tolsolver = 10**(-4)):
         tau = T*1.0/N
         ## Initializing right-hand side:
         lengths = self.createFFTLengths(N)
@@ -188,14 +189,12 @@ class CQModel:
                 else:
                     extr[:,i] = np.zeros(dof)
    #         ###  Use simplified Weighted Newon's method ######
-            sol[:,j*m+1:(j+1)*m+1] = extr
-            sol[:,j*m+1:(j+1)*m+1],info = self.newtonsolver(deltaEigs,rhs[:,j*m+1:(j+1)*m+1],W0,Tdiag,sol[:,j*m+1:(j+1)*m+1],tolsolver = tolsolver,charMatrix0 = np.zeros((2*dof,2*dof)))
+            sol[:,j*m+1:(j+1)*m+1],info = self.newtonsolver(deltaEigs,rhs[:,j*m+1:(j+1)*m+1],W0,Tdiag,extr)
             print("First Newton step finished. Info: ",info, "Norm of solution: ", np.linalg.norm(sol[:,j*m+1:(j+1)*m+1]))
 
             counter = 0
             while info >0:
-                    print(counter,info)
-                    sol[:,j*m+1:(j+1)*m+1],info = self.newtonsolver(deltaEigs,rhs[:,j*m+1:(j+1)*m+1],W0,Tdiag,sol[:,j*m+1:(j+1)*m+1],charMatrix0,coeff=0.5**counter)
+                    sol[:,j*m+1:(j+1)*m+1],info = self.newtonsolver(deltaEigs,rhs[:,j*m+1:(j+1)*m+1],W0,Tdiag,sol[:,j*m+1:(j+1)*m+1],coeff=0.5**counter)
                     if np.linalg.norm(sol[:,j*m+1:(j+1)*m+1])>10**5:
                         sol[:,j*m+1:(j+1)*m+1] = extr
                         break

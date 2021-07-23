@@ -69,10 +69,10 @@ for j in range(Am):
 #    plt.show()
 print(err1)
 print(err2)
-##print(sol)
+#print(sol)
 import matplotlib.pyplot as plt
-plt.plot(counters)
-plt.show()
+#plt.plot(counters)
+#plt.show()
 #plt.plot(sol[0,::m])
 #plt.plot(sol[1,::m])
 #plt.plot(ex_sol,linestyle='dashed')
@@ -86,4 +86,4 @@ plt.loglog(taus,taus**1,linestyle = 'dashed')
 plt.loglog(taus,taus**2,linestyle = 'dashed')
 plt.loglog(taus,taus**3,linestyle = 'dashed')
 plt.show()
-#    
+##    

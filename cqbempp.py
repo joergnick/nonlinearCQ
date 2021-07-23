@@ -43,7 +43,6 @@ class ScatModel(CQModel):
         dof = len(b)/2
         jb = 1j*np.zeros(2*dof)
         jb[:dof] = jacob*b[:dof]
-        jb[dof:] = np.zeros(dof)
         return jb
 
     def nonlinearity(self,coeff):
