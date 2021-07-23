@@ -9,13 +9,9 @@ gridfunList,neighborlist,domainDict = precompMM(RT_space)
 id_op=bempp.api.operators.boundary.sparse.identity(RT_space, RT_space, RT_space)
 id_weak = id_op.weak_form()
 def a(x):
-    #return np.linalg.norm(x)*x
-    return x
+    return np.linalg.norm(x)*x
 def Da(x):
-#    if np.linalg.norm(x)<10**(-15):
-#        x=10**(-15)*np.ones(3)
-    return np.eye(3)
-    #return -0.5*np.linalg.norm(x)**(-2.5)*np.outer(x,x)+np.linalg.norm(x)**(-0.5)*np.eye(3)
+    return -0.5*np.linalg.norm(x)**(-2.5)*np.outer(x,x)+np.linalg.norm(x)**(-0.5)*np.eye(3)
 
 counter = 0
 class ScatModel(CQModel):
@@ -43,7 +39,6 @@ class ScatModel(CQModel):
         dof = len(b)/2
         jb = 1j*np.zeros(2*dof)
         jb[:dof] = jacob*b[:dof]
-        jb[dof:] = np.zeros(dof)
         return jb
 
     def nonlinearity(self,coeff):
@@ -79,20 +74,16 @@ bempp.api.global_parameters.quadrature.medium.double_order =OrderQF-2
 bempp.api.global_parameters.quadrature.far.single_order =OrderQF-3
 bempp.api.global_parameters.quadrature.far.double_order =OrderQF-3
 bempp.api.global_parameters.quadrature.double_singular = OrderQF
-bempp.api.global_parameters.hmat.eps=10**-6
+bempp.api.global_parameters.hmat.eps=10**-4
 bempp.api.global_parameters.hmat.admissibility='strong'
 
 
 model = ScatModel()
-sol ,counters  = model.simulate(2,10,method = "RadauIIA-2")
-#import matplotlib.pyplot as plt
-#plt.plot(sol[0,:])
-#plt.show()
-dof = RT_space.global_dof_count
-gridfunphi = bempp.api.GridFunction(RT_space,coefficients = sol[:dof,-1])
+sol ,counters  = model.simulate(2,100,method = "RadauIIA-2")
+import matplotlib.pyplot as plt
+plt.plot(sol[0,:])
+plt.show()
 
-#gridfunpsi = bempp.api.GridFunction(RT_space,coefficients = sol[.1,dof:])
-gridfunphi.plot()
 #def harmonic_calderon(s,b,grid):
 #        points=np.array([[0],[0],[2]])
 #        #normb=np.linalg.norm(b[0])+np.linalg.norm(b[1])+np.linalg.norm(b[2])

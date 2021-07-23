@@ -15,26 +15,18 @@ class ScatModel(CQModel):
         #return 1.0/6*t**6+t**2.5
     def nonlinearity(self,x):
     #   print("X IN NONLINEARITY: ",x," RESULT : ",abs(x)**(-0.5)*x)
-        #val = 10000*x**3
         val = np.linalg.norm(x)**(-0.5)*x
-        #val = np.abs(x)**(-0.5)*x
-        #val = np.linalg.norm(x)**(-0.5)*x
-        #val = np.linalg.norm(x)**(-0.5)*x
-        #val = np.linalg.norm(x)**(-0.5)*x
         nanindizes = np.isnan(val)  
         val[nanindizes] = 0
         return val
-    def calcGradient(self,x):
-       # gradList = []
-       # for stageInd in range(m):
-       #     x= x0[:,stageInd]
-       #     grad = -0.5*np.linalg.norm(x)**(-2.5)*np.outer(x,x)+np.linalg.norm(x)**(-0.5)*np.eye(2)
-       #     gradList.append(grad)
+    def calcJacobian(self,x):
         return -0.5*np.linalg.norm(x)**(-2.5)*np.outer(x,x)+np.linalg.norm(x)**(-0.5)*np.eye(2)
+    def applyJacobian(self,jacob,b):
+        return jacob.dot(b)
        # raise NotImplementedError("Hi")
     def nonlinearityInverse(self,x):
         #val = np.linalg.norm(x)**(1)*x
-        val = np.abs(x)**(1)*x
+        val = np.linalg.norm(x)**(1)*x
         return val
         #return 0*x
         #return np.array([x[0]**1+x[1]**2,x[0]**3+x[1]**(1)])
@@ -63,7 +55,7 @@ for j in range(Am):
     #ex_sol = 4*3*tt**2
     #method = "BDF-"+str(m)
     method = "RadauIIA-"+str(m)
-    sol = model.simulate(T,N,method = method)
+    sol,counters = model.simulate(T,N,method = method)
     #err[j] = np.abs(sol[0,2]-tau**3)
     #print(err)
     err1[j] = max(np.abs(sol[0,::m]-ex_sol))
@@ -79,6 +71,8 @@ print(err1)
 print(err2)
 ##print(sol)
 import matplotlib.pyplot as plt
+plt.plot(counters)
+plt.show()
 #plt.plot(sol[0,::m])
 #plt.plot(sol[1,::m])
 #plt.plot(ex_sol,linestyle='dashed')
