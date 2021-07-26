@@ -79,7 +79,6 @@ class CQModel:
             ax0[:,stageInd] = self.nonlinearity(x0[:,stageInd])
         rhsNewton = stageRHS+ax0-rhs
         ## Solving system W0y = b
-        rhsNewton = np.matmul(rhsNewton,Tinv.T)
         rhsLong = 1j*np.zeros(m*dof)
         x0pureLong = 1j*np.zeros(m*dof)
         for stageInd in range(m):
@@ -90,11 +89,21 @@ class CQModel:
             Tinvdof = np.kron(Tinv,idMat)
             Tdiagdof = np.kron(Tdiag,idMat)
             ydummy = 1j*np.zeros(dof*m)
+            BsTxdummy = 1j*np.zeros(dof*m)
+            Daxdummy = 1j*np.zeros(dof*m)
+
             Txdummy = Tinvdof.dot(xdummy)
             for j in range(m):  
-                ydummy[j*dof:(j+1)*dof] = self.harmonicForward(deltaEigs[j],xdummy[j*dof:(j+1)*dof],precomp = W0[j])
-                Txdummy[j*dof:(j+1)*dof] =self.applyJacobian(jacobList[j],Txdummy[j*dof:(j+1)*dof])
-            ydummy = ydummy+Tdiagdof.dot(Txdummy)
+                BsTxdummy[j*dof:(j+1)*dof] = self.harmonicForward(deltaEigs[j],Txdummy[j*dof:(j+1)*dof],precomp = W0[j])
+                Daxdummy[j*dof:(j+1)*dof] =self.applyJacobian(jacobList[j],xdummy[j*dof:(j+1)*dof])
+            ydummy = Tdiagdof.dot(BsTxdummy)+Daxdummy
+
+#
+#            Txdummy = Tinvdof.dot(xdummy)
+#            for j in range(m):  
+#                ydummy[j*dof:(j+1)*dof] = self.harmonicForward(deltaEigs[j],xdummy[j*dof:(j+1)*dof],precomp = W0[j])
+#                Txdummy[j*dof:(j+1)*dof] =self.applyJacobian(jacobList[j],Txdummy[j*dof:(j+1)*dof])
+#            ydummy = ydummy+Tdiagdof.dot(Txdummy)
             return ydummy
         NewtonLambda = lambda x: NewtonFunc(x)
         from scipy.sparse.linalg import LinearOperator
@@ -106,22 +115,12 @@ class CQModel:
        # print(np.linalg.norm(dxlong-x0pureLong))
        # end1 = time.time()
         dxlong,info = gmres(NewtonOperator,rhsLong,restart = 2*dof,maxiter = 2*dof,x0=x0pureLong,tol=1e-6)
-        print("dxlong-x0pureLong: ",np.linalg.norm(dxlong-x0pureLong))
-       # print(np.linalg.norm(dxlong-x0pureLong))
-       # end2 = time.time()
-       # print("With value: ",end2-end1, "Without value: ",end1-start)
+        print("||dx||",np.linalg.norm(dxlong))
         if info != 0:
             print("GMRES Info not zero, Info: ", info)
-            ## Calculating Matrix
-           # NewtonMat = np.zeros((m*dof,m*dof))
-           # Mid = np.identity(m*dof)
-           # for k in range(m*dof):
-           #     NewtonMat[:,k] = NewtonFunc(Mid[:,k])
-            #print("Corresponding Matrix: ", NewtonMat, " Condition: ", np.linalg.cond(NewtonMat), " RHS : ",rhsLong)
         dx = 1j*np.zeros((dof,m))
         for stageInd in range(m):
             dx[:,stageInd] = dxlong[dof*stageInd:dof*(stageInd+1)]
-        dx = np.matmul(dx,Tdiag.T)  
         x1 = x0-coeff*dx
         #print("RESIDUUM: ",np.linalg.norm(dx))
         if coeff*np.linalg.norm(dx)/dof<tolsolver:

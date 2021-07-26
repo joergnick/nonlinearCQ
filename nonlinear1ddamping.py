@@ -34,7 +34,7 @@ class ScatModel(CQModel):
 model = ScatModel()
 #print(model.nonlinearity(model.nonlinearityInverse(np.array([-12312,123123]))))
 T  = 1
-Am = 5
+Am = 6
 m  = 2
 taus = np.zeros(Am)
 err1 = np.zeros(Am)
