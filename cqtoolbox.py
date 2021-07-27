@@ -54,14 +54,14 @@ class CQModel:
             jacobList[stageInd] = jacoba
         return jacobList
 
-    def newtonsolver(self,deltaEigs,rhs,W0,Tdiag, x0,tolsolver = 10**(-8),debugmode=False,coeff = 1):
+    def newtonsolver(self,deltaEigs,rhs,W0,Tdiag, x0,tolsolver = 10**(-6),debugmode=False,coeff = 1):
         x0pure = x0
         dof = len(rhs)
         m = len(W0)
         for stageInd in range(m):
             for j in range(dof):
-                if np.abs(x0[j,stageInd])<10**(-5):
-                    x0[j,stageInd] = 10**(-5)
+                if np.abs(x0[j,stageInd])<10**(-20):
+                    x0[j,stageInd] = 10**(-20)
         Tinv = np.linalg.inv(Tdiag)
         try:
             jacobList = [self.calcJacobian(x0[:,k]) for k in range(m)]
@@ -84,6 +84,7 @@ class CQModel:
         for stageInd in range(m):
             rhsLong[stageInd*dof:(stageInd+1)*dof] = rhsNewton[:,stageInd]
             x0pureLong[stageInd*dof:(stageInd+1)*dof] = x0pure[:,stageInd]
+
         def NewtonFunc(xdummy):
             idMat  = np.identity(dof)
             Tinvdof = np.kron(Tinv,idMat)
@@ -91,38 +92,22 @@ class CQModel:
             ydummy = 1j*np.zeros(dof*m)
             BsTxdummy = 1j*np.zeros(dof*m)
             Daxdummy = 1j*np.zeros(dof*m)
-
             Txdummy = Tinvdof.dot(xdummy)
             for j in range(m):  
                 BsTxdummy[j*dof:(j+1)*dof] = self.harmonicForward(deltaEigs[j],Txdummy[j*dof:(j+1)*dof],precomp = W0[j])
                 Daxdummy[j*dof:(j+1)*dof] =self.applyJacobian(jacobList[j],xdummy[j*dof:(j+1)*dof])
             ydummy = Tdiagdof.dot(BsTxdummy)+Daxdummy
-
-#
-#            Txdummy = Tinvdof.dot(xdummy)
-#            for j in range(m):  
-#                ydummy[j*dof:(j+1)*dof] = self.harmonicForward(deltaEigs[j],xdummy[j*dof:(j+1)*dof],precomp = W0[j])
-#                Txdummy[j*dof:(j+1)*dof] =self.applyJacobian(jacobList[j],Txdummy[j*dof:(j+1)*dof])
-#            ydummy = ydummy+Tdiagdof.dot(Txdummy)
             return ydummy
         NewtonLambda = lambda x: NewtonFunc(x)
         from scipy.sparse.linalg import LinearOperator
         NewtonOperator = LinearOperator((m*dof,m*dof),NewtonLambda)
-       # import time 
-       # start = time.time()
-        print("IN GMRES.")
-        #dxlong,info = gmres(NewtonOperator,rhsLong,maxiter = 1000,tol=1e-6)
-       # print(np.linalg.norm(dxlong-x0pureLong))
-       # end1 = time.time()
         dxlong,info = gmres(NewtonOperator,rhsLong,restart = 2*dof,maxiter = 2*dof,x0=x0pureLong,tol=1e-6)
-        print("||dx||",np.linalg.norm(dxlong))
         if info != 0:
             print("GMRES Info not zero, Info: ", info)
         dx = 1j*np.zeros((dof,m))
         for stageInd in range(m):
             dx[:,stageInd] = dxlong[dof*stageInd:dof*(stageInd+1)]
         x1 = x0-coeff*dx
-        #print("RESIDUUM: ",np.linalg.norm(dx))
         if coeff*np.linalg.norm(dx)/dof<tolsolver:
             info = 0
         else:
@@ -192,8 +177,14 @@ class CQModel:
             print("First Newton step finished. Info: ",info, "Norm of solution: ", np.linalg.norm(sol[:,j*m+1:(j+1)*m+1]))
 
             counter = 0
+            thresh = 10
             while info >0:
-                    sol[:,j*m+1:(j+1)*m+1],info = self.newtonsolver(deltaEigs,rhs[:,j*m+1:(j+1)*m+1],W0,Tdiag,sol[:,j*m+1:(j+1)*m+1],coeff=0.5**counter)
+                    if counter <=thresh:
+                        scal = 1 
+                    else:
+                        scal = 0.5
+                    sol[:,j*m+1:(j+1)*m+1],info = self.newtonsolver(deltaEigs,rhs[:,j*m+1:(j+1)*m+1],W0,Tdiag,sol[:,j*m+1:(j+1)*m+1],coeff=scal**(counter-thresh))
+                    print("INFO AFTER {} STEP: ".format(counter),info)
                     if np.linalg.norm(sol[:,j*m+1:(j+1)*m+1])>10**5:
                         sol[:,j*m+1:(j+1)*m+1] = extr
                         break

@@ -9,13 +9,13 @@ gridfunList,neighborlist,domainDict = precompMM(RT_space)
 id_op=bempp.api.operators.boundary.sparse.identity(RT_space, RT_space, RT_space)
 id_weak = id_op.weak_form()
 def a(x):
-    #return np.linalg.norm(x)*x
-    return x
+    return np.linalg.norm(x)**(-0.5)*x
+#    return x
 def Da(x):
 #    if np.linalg.norm(x)<10**(-15):
 #        x=10**(-15)*np.ones(3)
-    return np.eye(3)
-    #return -0.5*np.linalg.norm(x)**(-2.5)*np.outer(x,x)+np.linalg.norm(x)**(-0.5)*np.eye(3)
+#    return np.eye(3)
+    return -0.5*np.linalg.norm(x)**(-2.5)*np.outer(x,x)+np.linalg.norm(x)**(-0.5)*np.eye(3)
 
 counter = 0
 class ScatModel(CQModel):
@@ -34,23 +34,24 @@ class ScatModel(CQModel):
         return [bempp.api.BlockedDiscreteOperator(blocks),identity2]
     def harmonicForward(self,s,b,precomp = None):
         return precomp[0]*b
+        
     def calcJacobian(self,x):
         weightGF = bempp.api.GridFunction(RT_space,coefficients = x)
         jacob = sparseWeightedMM(RT_space,weightGF,Da,gridfunList,neighborlist,domainDict)
         return jacob
 
-    def applyJacobian(self,jacob,b):
-        dof = len(b)/2
-        jb = 1j*np.zeros(2*dof)
-        jb[:dof] = jacob*b[:dof]
-        return jb
+    def applyJacobian(self,jacob,x):
+        dof = len(x)/2
+        jx = 1j*np.zeros(2*dof)
+        jx[:dof] = jacob*x[:dof]
+        return jx
 
     def nonlinearity(self,coeff):
         dof = len(coeff)/2
         gridFun = bempp.api.GridFunction(RT_space,coefficients=coeff[:dof]) 
         agridFun= applyNonlinearity(gridFun,a,gridfunList,domainDict)
         result = np.zeros(2*dof) 
-        result[:dof] = agridFun.coefficients
+        result[:dof] = id_weak*agridFun.coefficients
         return result
 
     def righthandside(self,t,history=None):
@@ -64,6 +65,7 @@ class ScatModel(CQModel):
         gridfunrhs = bempp.api.GridFunction(RT_space,fun = func_rhs,dual_space = RT_space)
         dof = RT_space.global_dof_count
         rhs = np.zeros(dof*2)
+        rhs[:dof] = gridfunrhs.coefficients
         rhs[:dof] = id_weak*gridfunrhs.coefficients
         #print(np.linalg.norm(rhs))
         return rhs
@@ -83,15 +85,18 @@ bempp.api.global_parameters.hmat.admissibility='strong'
 
 
 model = ScatModel()
-sol ,counters  = model.simulate(2,10,method = "RadauIIA-2")
-#import matplotlib.pyplot as plt
-#plt.plot(sol[0,:])
-#plt.show()
+sol ,counters  = model.simulate(2,2,method = "RadauIIA-2")
+import matplotlib.pyplot as plt
 dof = RT_space.global_dof_count
-gridfunphi = bempp.api.GridFunction(RT_space,coefficients = sol[:dof,-1])
 
-#gridfunpsi = bempp.api.GridFunction(RT_space,coefficients = sol[.1,dof:])
-gridfunphi.plot()
+np.save('data/sol.npy',sol)
+#norms = [bempp.api.GridFunction(RT_space,coefficients = sol[:dof,k]).l2_norm() for k in range(len(sol[0,:]))]
+#plt.plot(norms)
+#plt.show()
+#gridfunphi = bempp.api.GridFunction(RT_space,coefficients = sol[:dof,-1])
+#
+##gridfunpsi = bempp.api.GridFunction(RT_space,coefficients = sol[.1,dof:])
+#gridfunphi.plot()
 #def harmonic_calderon(s,b,grid):
 #        points=np.array([[0],[0],[2]])
 #        #normb=np.linalg.norm(b[0])+np.linalg.norm(b[1])+np.linalg.norm(b[2])

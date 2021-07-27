@@ -34,7 +34,7 @@ class ScatModel(CQModel):
 model = ScatModel()
 #print(model.nonlinearity(model.nonlinearityInverse(np.array([-12312,123123]))))
 T  = 1
-Am = 6
+Am = 7
 m  = 2
 taus = np.zeros(Am)
 err1 = np.zeros(Am)
@@ -67,23 +67,23 @@ for j in range(Am):
 #    #plt.plot(sol[1,::m])
 #    plt.semilogy(ex_sol,linestyle='dashed')
 #    plt.show()
-print(err1)
-print(err2)
-#print(sol)
+#print(err1)
+#print(err2)
+##print(sol)
 import matplotlib.pyplot as plt
-#plt.plot(counters)
-#plt.show()
-#plt.plot(sol[0,::m])
-#plt.plot(sol[1,::m])
-#plt.plot(ex_sol,linestyle='dashed')
-#plt.show()
-##
-
-plt.loglog(taus,err1)
-plt.loglog(taus,err2)
-
-plt.loglog(taus,taus**1,linestyle = 'dashed')
-plt.loglog(taus,taus**2,linestyle = 'dashed')
-plt.loglog(taus,taus**3,linestyle = 'dashed')
+plt.plot(counters)
 plt.show()
-##    
+##plt.plot(sol[0,::m])
+##plt.plot(sol[1,::m])
+##plt.plot(ex_sol,linestyle='dashed')
+##plt.show()
+###
+#
+#plt.loglog(taus,err1)
+#plt.loglog(taus,err2)
+#
+#plt.loglog(taus,taus**1,linestyle = 'dashed')
+#plt.loglog(taus,taus**2,linestyle = 'dashed')
+#plt.loglog(taus,taus**3,linestyle = 'dashed')
+#plt.show()
+###    
