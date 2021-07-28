@@ -11,7 +11,7 @@ class CQModel:
     def time_step(self,s0,t,history,conv_history,x0):
         raise NotImplementedError("No time stepping given.") 
         ## Methods supplied by user:
-    def nonlinearity(self,x):
+    def nonlinearity(self,x,t):
         raise NotImplementedError("No nonlinearity given.")
     def nonlinearityInverse(self,x):
         raise NotImplementedError("No inverse to nonlinearity given.")
@@ -40,21 +40,21 @@ class CQModel:
             self.freqObj[s] = self.precomputing(s)
             self.freqUse[s] = 1
         return self.harmonicForward(s,b,precomp=self.freqObj[s])
-    def discreteJacobian(self,m,dof,x0):
+    def discreteJacobian(self,m,dof,x0,t):
         taugrad = 10**(-8)
         idMat = np.identity(dof)
         jacobList = m*[None]
         for stageInd in range(m):
             jacoba = np.zeros((dof,dof))
             for i in range(dof):
-                diff = (self.nonlinearity(x0[:,stageInd]+taugrad*idMat[:,i])-self.nonlinearity(x0[:,stageInd]-taugrad*idMat[:,i]))
+                diff = (self.nonlinearity(x0[:,stageInd]+taugrad*idMat[:,i],t+tau*c_RK[stageInd])-self.nonlinearity(x0[:,stageInd]-taugrad*idMat[:,i],t+tau*c_RK[stageInd]))
                 #if dof == 1:
                 jacoba[:,i] = diff/(2*taugrad)
                 #grada[stageInd*dof:(stageInd+1)*dof,stageInd*dof+i] = diff/(2*taugrad)
             jacobList[stageInd] = jacoba
         return jacobList
 
-    def newtonsolver(self,deltaEigs,rhs,W0,Tdiag, x0,tolsolver = 10**(-6),debugmode=False,coeff = 1):
+    def newtonsolver(self,t,tau,c_RK,deltaEigs,rhs,W0,Tdiag, x0,tolsolver = 10**(-6),debugmode=False,coeff = 1):
         x0pure = x0
         dof = len(rhs)
         m = len(W0)
@@ -64,9 +64,9 @@ class CQModel:
                     x0[j,stageInd] = 10**(-20)
         Tinv = np.linalg.inv(Tdiag)
         try:
-            jacobList = [self.calcJacobian(x0[:,k]) for k in range(m)]
+            jacobList = [self.calcJacobian(x0[:,k],t) for k in range(m)]
         except NotImplementedError:
-            jacobList = self.discreteJacobian(m,dof,x0)
+            jacobList = self.discreteJacobian(m,dof,x0,t)
         stageRHS = x0+1j*np.zeros((dof,m))
         ## Calculating right-hand side
         stageRHS = np.matmul(stageRHS,Tinv.T)
@@ -75,8 +75,9 @@ class CQModel:
         stageRHS = np.matmul(stageRHS,Tdiag.T)
         #rhsNewton = [stageRHS[:,k]+self.nonlinearity(x0[:,k])-rhs[:,k] for k in range(m)]
         ax0 = np.zeros((dof,m))
+        
         for stageInd in range(m):
-            ax0[:,stageInd] = self.nonlinearity(x0[:,stageInd])
+            ax0[:,stageInd] = self.nonlinearity(x0[:,stageInd],t+tau*c_RK[stageInd])
         rhsNewton = stageRHS+ax0-rhs
         ## Solving system W0y = b
         rhsLong = 1j*np.zeros(m*dof)

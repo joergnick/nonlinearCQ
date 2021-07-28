@@ -2,7 +2,7 @@ from cqtoolbox import CQModel
 from customOperators import precompMM,sparseWeightedMM,applyNonlinearity
 import bempp.api
 import numpy as np
-grid = bempp.api.shapes.sphere(h=1)
+grid = bempp.api.shapes.sphere(h=0.5)
 RT_space=bempp.api.function_space(grid, "RT",0)
 
 gridfunList,neighborlist,domainDict = precompMM(RT_space)
@@ -35,7 +35,7 @@ class ScatModel(CQModel):
     def harmonicForward(self,s,b,precomp = None):
         return precomp[0]*b
         
-    def calcJacobian(self,x):
+    def calcJacobian(self,x,t):
         weightGF = bempp.api.GridFunction(RT_space,coefficients = x)
         jacob = sparseWeightedMM(RT_space,weightGF,Da,gridfunList,neighborlist,domainDict)
         return jacob
@@ -46,7 +46,7 @@ class ScatModel(CQModel):
         jx[:dof] = jacob*x[:dof]
         return jx
 
-    def nonlinearity(self,coeff):
+    def nonlinearity(self,coeff,t):
         dof = len(coeff)/2
         gridFun = bempp.api.GridFunction(RT_space,coefficients=coeff[:dof]) 
         agridFun= applyNonlinearity(gridFun,a,gridfunList,domainDict)
@@ -70,7 +70,7 @@ class ScatModel(CQModel):
         #print(np.linalg.norm(rhs))
         return rhs
 
-OrderQF = 8
+OrderQF = 5
 bempp.api.global_parameters.quadrature.near.max_rel_dist = 2
 bempp.api.global_parameters.quadrature.near.single_order =OrderQF-1
 bempp.api.global_parameters.quadrature.near.double_order = OrderQF-1
@@ -85,11 +85,16 @@ bempp.api.global_parameters.hmat.admissibility='strong'
 
 
 model = ScatModel()
-sol ,counters  = model.simulate(2,2,method = "RadauIIA-2")
+import time
+start = time.time()
+sol ,counters  = model.simulate(3,100,method = "RadauIIA-2")
+end = time.time()
 import matplotlib.pyplot as plt
 dof = RT_space.global_dof_count
 
 np.save('data/sol.npy',sol)
+
+np.save('data/counters.npy',counters)
 #norms = [bempp.api.GridFunction(RT_space,coefficients = sol[:dof,k]).l2_norm() for k in range(len(sol[0,:]))]
 #plt.plot(norms)
 #plt.show()
