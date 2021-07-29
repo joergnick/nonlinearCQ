@@ -174,7 +174,7 @@ class CQModel:
                 else:
                     extr[:,i] = np.zeros(dof)
    #         ###  Use simplified Weighted Newon's method ######
-            sol[:,j*m+1:(j+1)*m+1],info = self.newtonsolver(deltaEigs,rhs[:,j*m+1:(j+1)*m+1],W0,Tdiag,extr)
+            sol[:,j*m+1:(j+1)*m+1],info = self.newtonsolver(tj,tau,c_RK,deltaEigs,rhs[:,j*m+1:(j+1)*m+1],W0,Tdiag,extr)
             print("First Newton step finished. Info: ",info, "Norm of solution: ", np.linalg.norm(sol[:,j*m+1:(j+1)*m+1]))
 
             counter = 0
@@ -184,7 +184,7 @@ class CQModel:
                         scal = 1 
                     else:
                         scal = 0.5
-                    sol[:,j*m+1:(j+1)*m+1],info = self.newtonsolver(deltaEigs,rhs[:,j*m+1:(j+1)*m+1],W0,Tdiag,sol[:,j*m+1:(j+1)*m+1],coeff=scal**(counter-thresh))
+                    sol[:,j*m+1:(j+1)*m+1],info = self.newtonsolver(tj,tau,c_RK,deltaEigs,rhs[:,j*m+1:(j+1)*m+1],W0,Tdiag,sol[:,j*m+1:(j+1)*m+1],coeff=scal**(counter-thresh))
                     print("INFO AFTER {} STEP: ".format(counter),info)
                     if np.linalg.norm(sol[:,j*m+1:(j+1)*m+1])>10**5:
                         sol[:,j*m+1:(j+1)*m+1] = extr

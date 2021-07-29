@@ -9,13 +9,13 @@ gridfunList,neighborlist,domainDict = precompMM(RT_space)
 id_op=bempp.api.operators.boundary.sparse.identity(RT_space, RT_space, RT_space)
 id_weak = id_op.weak_form()
 def a(x):
-    return np.linalg.norm(x)**(-0.5)*x
-#    return x
+#    return np.linalg.norm(x)**(-0.5)*x
+    return x
 def Da(x):
 #    if np.linalg.norm(x)<10**(-15):
 #        x=10**(-15)*np.ones(3)
-#    return np.eye(3)
-    return -0.5*np.linalg.norm(x)**(-2.5)*np.outer(x,x)+np.linalg.norm(x)**(-0.5)*np.eye(3)
+    return np.eye(3)
+#    return -0.5*np.linalg.norm(x)**(-2.5)*np.outer(x,x)+np.linalg.norm(x)**(-0.5)*np.eye(3)
 
 counter = 0
 class ScatModel(CQModel):
@@ -70,7 +70,20 @@ class ScatModel(CQModel):
         #print(np.linalg.norm(rhs))
         return rhs
 
-OrderQF = 5
+Ord =inv(s,b):
+        return s**(-1)*b
+    IntegralOperator=Conv_Operator(sinv)
+    def HarmonicImpedance(s,b):
+        return b
+    TimeImpedance=Conv_Operator(HarmonicImpedance)  
+
+    if (m==2):
+        gTH=IntegralOperator.apply_RKconvol(curls,T,method="RadauIIA-2",show_progress=False)
+        ZptNeuTrace=TimeImpedance.apply_RKconvol(curls,T,method="RadauIIA-2",show_progress=False)
+    if (m==3):
+        gTH=IntegralOperator.apply_RKconvol(curls,T,method="RadauIIA-3",show_progress=False)
+        ZptNeuTrace=TimeImpedance.apply_RKconvol(curls,T,method="RadauIIA-3",show_progress=False)
+    return rhs7
 bempp.api.global_parameters.quadrature.near.max_rel_dist = 2
 bempp.api.global_parameters.quadrature.near.single_order =OrderQF-1
 bempp.api.global_parameters.quadrature.near.double_order = OrderQF-1
