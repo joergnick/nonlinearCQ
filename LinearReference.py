@@ -222,15 +222,19 @@ def scattering_solution(dx,N,T,m):
         num_solStages=ScatOperator.apply_RKconvol(rhs,T,cutoff=10**(-5),method="RadauIIA-2")
     if (m==3):
         num_solStages=ScatOperator.apply_RKconvol(rhs,T,cutoff=10**(-5),method="RadauIIA-3")
-    num_sol=np.zeros((len(num_solStages[:,0]),N+1)) 
-    num_sol[:,1:N+1]=np.real(num_solStages[:,m-1:N*m:m])
+    num_sol=np.zeros((len(num_solStages[:,0]),m*N+1)) 
+    num_sol[:,1:]=np.real(num_solStages)
+    #num_sol[:,1:N+1]=np.real(num_solStages[:,m-1:N*m:m])
     return num_sol
 import time
 
-sol = scattering_solution(0.5,30,4,2)
+sol = scattering_solution(1,30,4,2)
+print(sol.shape)
 import matplotlib.pyplot as plt
 print(sol[0,:])
+norms = [np.linalg.norm(sol[:,k]) for k in range(len(sol[0,:]))]
 plt.plot(sol[0,:])
+plt.plot(norms,linestyle='dashed')
 plt.show()
 
 #

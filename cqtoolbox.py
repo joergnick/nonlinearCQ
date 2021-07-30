@@ -55,7 +55,7 @@ class CQModel:
             jacobList[stageInd] = jacoba
         return jacobList
 
-    def newtonsolver(self,t,tau,c_RK,deltaEigs,rhs,W0,Tdiag, x0,tolsolver = 10**(-6),debugmode=False,coeff = 1):
+    def newtonsolver(self,t,tau,c_RK,deltaEigs,rhs,W0,Tdiag, x0,rhsInhom,tolsolver = 10**(-6),debugmode=False,coeff = 1):
         x0pure = x0
         dof = len(rhs)
         m = len(W0)
@@ -65,7 +65,7 @@ class CQModel:
                     x0[j,stageInd] = 10**(-20)
         Tinv = np.linalg.inv(Tdiag)
         try:
-            jacobList = [self.calcJacobian(x0[:,k],t) for k in range(m)]
+            jacobList = [self.calcJacobian(x0[:,k],t,rhsInhom[:,k]) for k in range(m)]
         except NotImplementedError:
             jacobList = self.discreteJacobian(m,dof,x0,t)
         stageRHS = x0+1j*np.zeros((dof,m))
@@ -78,7 +78,7 @@ class CQModel:
         ax0 = np.zeros((dof,m))
         
         for stageInd in range(m):
-            ax0[:,stageInd] = self.nonlinearity(x0[:,stageInd],t+tau*c_RK[stageInd])
+            ax0[:,stageInd] = self.nonlinearity(x0[:,stageInd],t+tau*c_RK[stageInd],rhsInhom[:,stageInd])
         rhsNewton = stageRHS+ax0-rhs
         ## Solving system W0y = b
         rhsLong = 1j*np.zeros(m*dof)
@@ -185,7 +185,7 @@ class CQModel:
                         scal = 1 
                     else:
                         scal = 0.5
-                    sol[:,j*m+1:(j+1)*m+1],info = self.newtonsolver(tj,tau,c_RK,deltaEigs,rhs[:,j*m+1:(j+1)*m+1],W0,Tdiag,sol[:,j*m+1:(j+1)*m+1],coeff=scal**(counter-thresh))
+                    sol[:,j*m+1:(j+1)*m+1],info = self.newtonsolver(tj,tau,c_RK,deltaEigs,rhs[:,j*m+1:(j+1)*m+1],W0,Tdiag,sol[:,j*m+1:(j+1)*m+1],rhsInhom[:,j*m+1:(j+1)*m+1],coeff=scal**(counter-thresh))
                     print("INFO AFTER {} STEP: ".format(counter),info)
                     if np.linalg.norm(sol[:,j*m+1:(j+1)*m+1])>10**5:
                         sol[:,j*m+1:(j+1)*m+1] = extr
