@@ -66,15 +66,16 @@ def create_rhs(grid,dx,N,T,m):
             curlU=np.array([ 0. * x[2],-100*(x[2]-t+2)*np.exp(-50*(x[2]-t+2)**2), 0. * x[2]])
             result[:] = np.cross(curlU , n)
 
-        curl_fun = bempp.api.GridFunction(RT_space, fun=curl_trace,dual_space=RT_space)
-        trace_fun= bempp.api.GridFunction(RT_space, fun=tangential_trace,dual_space=RT_space)
-        rhs[0:dof,j]=trace_fun.coefficients 
-        curlCoeffs=curl_fun.coefficients
-        if np.linalg.norm(curlCoeffs)>10**-9:
+        curl_fun     = bempp.api.GridFunction(RT_space, fun=curl_trace,dual_space=RT_space)
+        trace_fun    = bempp.api.GridFunction(RT_space, fun=tangential_trace,dual_space=RT_space)
+        rhs[0:dof,j] = trace_fun.coefficients 
+        curlCoeffs   = curl_fun.coefficients
+        if np.linalg.norm(curlCoeffs) > 10**-9:
             curls[0:dof,j]=curlCoeffs
 
     def sinv(s,b):
         return s**(-1)*b
+
     IntegralOperator=Conv_Operator(sinv)
     def HarmonicImpedance(s,b):
         return b
@@ -82,10 +83,11 @@ def create_rhs(grid,dx,N,T,m):
 
     if (m==2):
         gTH=IntegralOperator.apply_RKconvol(curls,T,method="RadauIIA-2",show_progress=False)
-        ZptNeuTrace=TimeImpedance.apply_RKconvol(curls,T,method="RadauIIA-2",show_progress=False)
+        ZptNeuTrace=TimeImpedance.apply_RKconvol(gTH,T,method="RadauIIA-2",show_progress=False)
     if (m==3):
         gTH=IntegralOperator.apply_RKconvol(curls,T,method="RadauIIA-3",show_progress=False)
-        ZptNeuTrace=TimeImpedance.apply_RKconvol(curls,T,method="RadauIIA-3",show_progress=False)
+        ZptNeuTrace=TimeImpedance.apply_RKconvol(gTH,T,method="RadauIIA-3",show_progress=False)
+    rhs[0:dof,:]=np.real(ZptNeuTrace)-rhs[0:dof,:]
     return rhs
 
 def harmonic_calderon(s,b,grid):
@@ -148,7 +150,7 @@ def harmonic_calderon(s,b,grid):
     blocks=np.array([[None,None], [None,None]])
 
     #blocks[0,0] = -elec.weak_form()+10*s**0.5*identity2.weak_form()
-    blocks[0,0] = -elec.weak_form()+0.0*s**0.5*identity2.weak_form()
+    blocks[0,0] = -elec.weak_form()+identity2.weak_form()
     blocks[0,1] =  magn.weak_form()-1.0/2*identity.weak_form()
     blocks[1,0] = -magn.weak_form()-1.0/2*identity.weak_form()
     blocks[1,1] = -elec.weak_form()
@@ -225,22 +227,23 @@ def scattering_solution(dx,N,T,m):
     return num_sol
 import time
 
-sol = scattering_solution(1,30,4,2)
+sol = scattering_solution(0.5,30,4,2)
 import matplotlib.pyplot as plt
+print(sol[0,:])
 plt.plot(sol[0,:])
 plt.show()
 
-
-T=6
-#N_ref=2**4
-N_ref=2**11
-tt_ref=np.linspace(0,T,N_ref+1)
-#dx_ref=np.sqrt(2)**(0)
-dx_ref=np.sqrt(2)**(-9)
-m=3
-
-import matplotlib.pyplot as plt
-start=time.time()
+#
+#T=6
+##N_ref=2**4
+#N_ref=2**11
+#tt_ref=np.linspace(0,T,N_ref+1)
+##dx_ref=np.sqrt(2)**(0)
+#dx_ref=np.sqrt(2)**(-9)
+#m=3
+#
+#import matplotlib.pyplot as plt
+#start=time.time()
 #sol_ref=scattering_solution(dx_ref,N_ref,T)
 #sol_ref2=scattering_solution(dx_ref,N_ref,T)
 #
@@ -252,60 +255,5 @@ start=time.time()
 #plt.show()
 
 
-sol_ref=scattering_solution(dx_ref,N_ref,T,m)
-#
-np.save("data/sol_ref_absorbing_delta0p1_N2h11_dxsqrt2m9RK5.npy",sol_ref)
-#sol_ref=np.load("data/sol_ref_absorbing_delta0p1_N2h11_dxsqrt2m10RK5.npy")
-#Current Reference solutions:
-#np.save("data/sol_ref_absorbing_delta0p1_N212_dxsqrt2m9RK5.npy",sol_ref)
+#sol_ref=scattering_solution(dx_ref,N_ref,T,m)
 
-
-#np.save("data/sol_ref_absorbing_delta001_N212_dxsqrt2m9RK3.npy",sol_ref)
-#sol_ref=np.load("data/sol_ref_absorbing_delta1_N212_dxsqrt2m9RK3.npy")
-#sol_ref=np.load("data/sol_ref_absorbing_delta001_N212_dxsqrt2m9RK3.npy")
-#sol_ref=np.load("data/sol_ref_absorbing_N212_dxsqrt2m7RK5.npy")
-#import scipy.io
-#scipy.io.loadmat('data/Err_data_delta1.mat')
-#tt=np.linspace(0,T,N_ref+1)
-#plt.plot(tt,sol_ref[0,:])
-#plt.show()
-
-#plt.plot(sol_ref[0,:]**2+sol_ref[1,:]**2+sol_ref[2,:]**2)
-#plt.show()
-Am_space=8
-Am_time=7
-#Am_space=1
-#Am_time=8
-tau_s=np.zeros(Am_time)
-h_s=np.zeros(Am_space)
-errors=np.zeros((Am_space,Am_time))
-
-m=2
-for ixSpace in range(Am_space):
-    for ixTime in range(Am_time):
-        N=8*2**(ixTime)
-        tau_s[ixTime]=T*1.0/N
-        tt=np.linspace(0,T,N+1)
-        dx=np.sqrt(2)**(-ixSpace)
-        h_s[ixSpace]=dx
-
-########## Rescaling reference solution:        
-        speed=N_ref/N
-        resc_ref=np.zeros((3,N+1))
-    #   resc_ref=sol_ref
-        for j in range(N+1):
-            resc_ref[:,j]      = sol_ref[:,j*speed]
-        #num_sol = calc_ref_sol(N,dx,F_transfer)    
-        num_sol  = scattering_solution(dx,N,T,m)
-    #   plt.plot(tt,num_sol[0,:]**2+num_sol[1,:]**2+num_sol[2,:]**2)
-    #   plt.plot(tt_ref,sol_ref[0,:]**2+sol_ref[1,:]**2+sol_ref[2,:]**2,linestyle='dashed')
-#       plt.show()
-    
-        errors[ixSpace,ixTime]=np.max(np.abs(resc_ref-num_sol))
-        print(errors)
-        import scipy.io
-        scipy.io.savemat('data/Err_data_delta01.mat', dict( ERR=errors,h_s=h_s,tau_s=tau_s))
-        #scipy.io.savemat('data/Err_data_delta0p1_long.mat', dict( ERR=errors,h_s=h_s,tau_s=tau_s))
-end=time.time()
-print("Script Runtime: "+str((end-start)/60) +" Min")
-#

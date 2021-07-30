@@ -40,6 +40,7 @@ class CQModel:
             self.freqObj[s] = self.precomputing(s)
             self.freqUse[s] = 1
         return self.harmonicForward(s,b,precomp=self.freqObj[s])
+
     def discreteJacobian(self,m,dof,x0,t):
         taugrad = 10**(-8)
         idMat = np.identity(dof)
@@ -140,7 +141,7 @@ class CQModel:
             extrU = extrU+gammas[j]*u[:,-p-1+j]
         return extrU
     
-    def simulate(self,T,N,method = "RadauIIA-2",tolsolver = 10**(-4)):
+    def simulate(self,T,N,rhsInhom=None,method = "RadauIIA-2",tolsolver = 10**(-4)):
         tau = T*1.0/N
         ## Initializing right-hand side:
         lengths = self.createFFTLengths(N)
@@ -174,7 +175,7 @@ class CQModel:
                 else:
                     extr[:,i] = np.zeros(dof)
    #         ###  Use simplified Weighted Newon's method ######
-            sol[:,j*m+1:(j+1)*m+1],info = self.newtonsolver(tj,tau,c_RK,deltaEigs,rhs[:,j*m+1:(j+1)*m+1],W0,Tdiag,extr)
+            sol[:,j*m+1:(j+1)*m+1],info = self.newtonsolver(tj,tau,c_RK,deltaEigs,rhs[:,j*m+1:(j+1)*m+1],W0,Tdiag,extr,rhsInhom[:,j*m+1:(j+1)*m+1])
             print("First Newton step finished. Info: ",info, "Norm of solution: ", np.linalg.norm(sol[:,j*m+1:(j+1)*m+1]))
 
             counter = 0

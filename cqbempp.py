@@ -2,7 +2,7 @@ from cqtoolbox import CQModel
 from customOperators import precompMM,sparseWeightedMM,applyNonlinearity
 import bempp.api
 import numpy as np
-grid = bempp.api.shapes.sphere(h=0.5)
+grid = bempp.api.shapes.sphere(h=1)
 RT_space=bempp.api.function_space(grid, "RT",0)
 
 gridfunList,neighborlist,domainDict = precompMM(RT_space)
@@ -17,7 +17,6 @@ def Da(x):
     return np.eye(3)
 #    return -0.5*np.linalg.norm(x)**(-2.5)*np.outer(x,x)+np.linalg.norm(x)**(-0.5)*np.eye(3)
 
-counter = 0
 class ScatModel(CQModel):
     def precomputing(self,s):
         NC_space=bempp.api.function_space(grid, "NC",0)
@@ -70,20 +69,33 @@ class ScatModel(CQModel):
         #print(np.linalg.norm(rhs))
         return rhs
 
-Ord =inv(s,b):
+def calcRighthandside(c_RK,grid,N,T):
+    m = len(c_RK)
+    tau = T*1.0/N
+    RT_space=bempp.api.function_space(grid, "RT",0)
+    dof = RT_space.global_dof_count
+    rhs = np.zeros((2*dof,m*N+1))
+    curls = np.zeros((dof,m*N+1))
+    for j in range(N):
+        for stageInd in range(m):
+            t = tau*j+tau*c_RK[stageInd] 
+            def func_rhs(x,n,domain_index,result):
+                inc =  np.array([np.exp(-50*(x[2]-t+2)**2), 0. * x[2], 0. * x[2]])    
+                tang = np.cross(n,np.cross(inc, n))
+                result[:] = tang
+            gridfunrhs = bempp.api.GridFunction(RT_space,fun = func_rhs,dual_space = RT_space)
+            def func_curls(x,n,domain_index,result):
+                curlU=np.array([ 0. * x[2],-100*(x[2]-t+2)*np.exp(-50*(x[2]-t+2)**2), 0. * x[2]])
+                result[:] = np.cross(curlU,n)
+            curlfun = bempp.api.GridFunction(RT_space,fun = func_curls,dual_space = RT_space) 
+            rhs[dof:,j*m+stageInd] = curlfun.coefficients
+    def sinv(s,b):
         return s**(-1)*b
     IntegralOperator=Conv_Operator(sinv)
-    def HarmonicImpedance(s,b):
-        return b
-    TimeImpedance=Conv_Operator(HarmonicImpedance)  
-
-    if (m==2):
-        gTH=IntegralOperator.apply_RKconvol(curls,T,method="RadauIIA-2",show_progress=False)
-        ZptNeuTrace=TimeImpedance.apply_RKconvol(curls,T,method="RadauIIA-2",show_progress=False)
-    if (m==3):
-        gTH=IntegralOperator.apply_RKconvol(curls,T,method="RadauIIA-3",show_progress=False)
-        ZptNeuTrace=TimeImpedance.apply_RKconvol(curls,T,method="RadauIIA-3",show_progress=False)
-    return rhs7
+    gTH=IntegralOperator.apply_RKconvol(curls,T,method="RadauIIA-"+str(m),show_progress=False)
+    rhs[0:dof,:]=np.real(gTH)-rhs[0:dof,:]
+    return rhs
+OrderQF = 8
 bempp.api.global_parameters.quadrature.near.max_rel_dist = 2
 bempp.api.global_parameters.quadrature.near.single_order =OrderQF-1
 bempp.api.global_parameters.quadrature.near.double_order = OrderQF-1
@@ -100,7 +112,13 @@ bempp.api.global_parameters.hmat.admissibility='strong'
 model = ScatModel()
 import time
 start = time.time()
-sol ,counters  = model.simulate(3,100,method = "RadauIIA-2")
+m = 2
+[A_RK,b_RK,c_RK,m] = model.tdForward.get_method_characteristics("RadauIIA-"+str(m))
+N =30
+T=4
+rhsInhom = calcRighthandside(c_RK,grid,N,T)
+print("Finished RHS.")
+sol ,counters  = model.simulate(3,100,rhsInhom =rhsInhom, method = "RadauIIA-2")
 end = time.time()
 import matplotlib.pyplot as plt
 dof = RT_space.global_dof_count
