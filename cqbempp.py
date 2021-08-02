@@ -3,7 +3,7 @@ from linearcq import Conv_Operator
 from customOperators import precompMM,sparseWeightedMM,applyNonlinearity
 import bempp.api
 import numpy as np
-grid = bempp.api.shapes.sphere(h=0.3)
+grid = bempp.api.shapes.sphere(h=0.2)
 RT_space=bempp.api.function_space(grid, "RT",0)
 
 gridfunList,neighborlist,domainDict = precompMM(RT_space)
@@ -99,8 +99,8 @@ def calcRighthandside(c_RK,grid,N,T):
     gTH=IntegralOperator.apply_RKconvol(curls,T,method="RadauIIA-"+str(m),show_progress=False)
     gTH = np.concatenate((np.zeros((dof,1)),gTH),axis = 1)
     #rhs[0:dof,:]=np.real(gTH)-rhs[0:dof,:]
-    return gTH
-OrderQF = 8
+    return -gTH
+OrderQF = 7
 bempp.api.global_parameters.quadrature.near.max_rel_dist = 2
 bempp.api.global_parameters.quadrature.near.single_order =OrderQF-1
 bempp.api.global_parameters.quadrature.near.double_order = OrderQF-1
@@ -117,9 +117,9 @@ bempp.api.global_parameters.hmat.admissibility='strong'
 model = ScatModel()
 import time
 start = time.time()
-m = 2
+m = 3
 [A_RK,b_RK,c_RK,m] = model.tdForward.get_method_characteristics("RadauIIA-"+str(m))
-N =100
+N =400
 T=4
 
 dof = RT_space.global_dof_count
@@ -131,9 +131,9 @@ end = time.time()
 import matplotlib.pyplot as plt
 dof = RT_space.global_dof_count
 norms = [np.linalg.norm(sol[:,k]) for k in range(len(sol[0,:]))]
-np.save('data/sol.npy',sol)
+np.save('data/solsmall.npy',sol)
 
-np.save('data/counters.npy',counters)
+np.save('data/counterssmall.npy',counters)
 
 plt.plot(norms)
 
@@ -208,5 +208,5 @@ plt.show()
 ##       print("NORM B :" ,np.linalg.norm(b))
 #        if np.isnan(scattered_field_data).any():
 #                print("NAN Warning, s = ", s)
-#                scattered_field_data=np.zeros(np.shape(scattered_field_data))
+#                scattered_field_data=np.zeros(np.shape(scattered_field_data)3
 #        return scattered_field_data.reshape(3,1)[:,0]
