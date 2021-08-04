@@ -3,7 +3,7 @@ from linearcq import Conv_Operator
 from customOperators import precompMM,sparseWeightedMM,applyNonlinearity
 import bempp.api
 import numpy as np
-grid = bempp.api.shapes.sphere(h=0.2)
+grid = bempp.api.shapes.sphere(h=0.5)
 RT_space=bempp.api.function_space(grid, "RT",0)
 
 gridfunList,neighborlist,domainDict = precompMM(RT_space)
@@ -100,7 +100,7 @@ def calcRighthandside(c_RK,grid,N,T):
     gTH = np.concatenate((np.zeros((dof,1)),gTH),axis = 1)
     #rhs[0:dof,:]=np.real(gTH)-rhs[0:dof,:]
     return -gTH
-OrderQF = 7
+OrderQF = 8
 bempp.api.global_parameters.quadrature.near.max_rel_dist = 2
 bempp.api.global_parameters.quadrature.near.single_order =OrderQF-1
 bempp.api.global_parameters.quadrature.near.double_order = OrderQF-1
@@ -119,7 +119,7 @@ import time
 start = time.time()
 m = 3
 [A_RK,b_RK,c_RK,m] = model.tdForward.get_method_characteristics("RadauIIA-"+str(m))
-N =400
+N =50
 T=4
 
 dof = RT_space.global_dof_count
@@ -131,7 +131,7 @@ end = time.time()
 import matplotlib.pyplot as plt
 dof = RT_space.global_dof_count
 norms = [np.linalg.norm(sol[:,k]) for k in range(len(sol[0,:]))]
-np.save('data/solsmall.npy',sol)
+np.save('data/solh1N50m3.npy',sol)
 
 np.save('data/counterssmall.npy',counters)
 

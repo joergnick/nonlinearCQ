@@ -61,8 +61,8 @@ class CQModel:
         m = len(W0)
         for stageInd in range(m):
             for j in range(dof):
-                if np.abs(x0[j,stageInd])<10**(-20):
-                    x0[j,stageInd] = 10**(-20)
+                if np.abs(x0[j,stageInd])<10**(-10):
+                    x0[j,stageInd] = 10**(-10)
         Tinv = np.linalg.inv(Tdiag)
         try:
             jacobList = [self.calcJacobian(x0[:,k],t,rhsInhom[:,k]) for k in range(m)]
@@ -88,8 +88,11 @@ class CQModel:
             x0pureLong[stageInd*dof:(stageInd+1)*dof] = x0pure[:,stageInd]
 
         def NewtonFunc(xdummy):
+            print("New call.")
             idMat  = np.identity(dof)
             Tinvdof = np.kron(Tinv,idMat)
+            print(np.abs(Tinv))
+            print("Tinvdof: ",np.abs(Tinvdof))
             Tdiagdof = np.kron(Tdiag,idMat)
             ydummy = 1j*np.zeros(dof*m)
             BsTxdummy = 1j*np.zeros(dof*m)
@@ -103,7 +106,8 @@ class CQModel:
         NewtonLambda = lambda x: NewtonFunc(x)
         from scipy.sparse.linalg import LinearOperator
         NewtonOperator = LinearOperator((m*dof,m*dof),NewtonLambda)
-        dxlong,info = gmres(NewtonOperator,rhsLong,restart = 2*dof,maxiter = 2*dof,x0=x0pureLong,tol=1e-6)
+        dxlong,info = gmres(NewtonOperator,rhsLong,maxiter = 500,x0=x0pureLong,tol=1e-5)
+        #dxlong,info = gmres(NewtonOperator,rhsLong,restart = 2*dof,maxiter = 2*dof,x0=x0pureLong,tol=1e-5)
         if info != 0:
             print("GMRES Info not zero, Info: ", info)
         dx = 1j*np.zeros((dof,m))
@@ -141,7 +145,7 @@ class CQModel:
             extrU = extrU+gammas[j]*u[:,-p-1+j]
         return extrU
     
-    def simulate(self,T,N,rhsInhom=None,method = "RadauIIA-2",tolsolver = 10**(-4)):
+    def simulate(self,T,N,rhsInhom=None,method = "RadauIIA-2",tolsolver = 10**(-5)):
         tau = T*1.0/N
         ## Initializing right-hand side:
         lengths = self.createFFTLengths(N)
@@ -164,6 +168,8 @@ class CQModel:
         sol = np.zeros((dof,m*N+1))
         extr = np.zeros((dof,m))
         counters = np.zeros(N)
+        if rhsInhom is None:
+            rhsInhom = np.zeros((dof,m*N+1))
         for j in range(0,N):
             print(j*1.0/N)
             ## Calculating solution at timepoint tj
@@ -179,12 +185,12 @@ class CQModel:
             print("First Newton step finished. Info: ",info, "Norm of solution: ", np.linalg.norm(sol[:,j*m+1:(j+1)*m+1]))
 
             counter = 0
-            thresh = 10
+            thresh = 3
             while info >0:
                     if counter <=thresh:
                         scal = 1 
                     else:
-                        scal = 0.5
+                        scal = 0.25
                     sol[:,j*m+1:(j+1)*m+1],info = self.newtonsolver(tj,tau,c_RK,deltaEigs,rhs[:,j*m+1:(j+1)*m+1],W0,Tdiag,sol[:,j*m+1:(j+1)*m+1],rhsInhom[:,j*m+1:(j+1)*m+1],coeff=scal**(counter-thresh))
                     print("INFO AFTER {} STEP: ".format(counter),info)
                     if np.linalg.norm(sol[:,j*m+1:(j+1)*m+1])>10**5:
