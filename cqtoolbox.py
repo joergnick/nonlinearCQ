@@ -88,11 +88,8 @@ class CQModel:
             x0pureLong[stageInd*dof:(stageInd+1)*dof] = x0pure[:,stageInd]
 
         def NewtonFunc(xdummy):
-            print("New call.")
             idMat  = np.identity(dof)
             Tinvdof = np.kron(Tinv,idMat)
-            print(np.abs(Tinv))
-            print("Tinvdof: ",np.abs(Tinvdof))
             Tdiagdof = np.kron(Tdiag,idMat)
             ydummy = 1j*np.zeros(dof*m)
             BsTxdummy = 1j*np.zeros(dof*m)

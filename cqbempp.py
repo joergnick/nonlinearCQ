@@ -3,12 +3,18 @@ from linearcq import Conv_Operator
 from customOperators import precompMM,sparseWeightedMM,applyNonlinearity
 import bempp.api
 import numpy as np
-grid = bempp.api.shapes.sphere(h=0.5)
-RT_space=bempp.api.function_space(grid, "RT",0)
-
-gridfunList,neighborlist,domainDict = precompMM(RT_space)
-id_op=bempp.api.operators.boundary.sparse.identity(RT_space, RT_space, RT_space)
-id_weak = id_op.weak_form()
+OrderQF = 8
+bempp.api.global_parameters.quadrature.near.max_rel_dist = 2
+bempp.api.global_parameters.quadrature.near.single_order =OrderQF-1
+bempp.api.global_parameters.quadrature.near.double_order = OrderQF-1
+bempp.api.global_parameters.quadrature.medium.max_rel_dist =4
+bempp.api.global_parameters.quadrature.medium.single_order =OrderQF-2
+bempp.api.global_parameters.quadrature.medium.double_order =OrderQF-2
+bempp.api.global_parameters.quadrature.far.single_order =OrderQF-3
+bempp.api.global_parameters.quadrature.far.double_order =OrderQF-3
+bempp.api.global_parameters.quadrature.double_singular = OrderQF
+bempp.api.global_parameters.hmat.eps=10**-5
+bempp.api.global_parameters.hmat.admissibility='strong'
 def a(x):
     return np.linalg.norm(x)**(-0.5)*x
 #    return x
@@ -17,61 +23,6 @@ def Da(x):
 #        x=10**(-15)*np.ones(3)
 #    return np.eye(3)
     return -0.5*np.linalg.norm(x)**(-2.5)*np.outer(x,x)+np.linalg.norm(x)**(-0.5)*np.eye(3)
-
-class ScatModel(CQModel):
-    def precomputing(self,s):
-        NC_space=bempp.api.function_space(grid, "NC",0)
-        RT_space=bempp.api.function_space(grid, "RT",0)
-        elec = -bempp.api.operators.boundary.maxwell.electric_field(RT_space, RT_space, NC_space,1j*s)
-        magn = -bempp.api.operators.boundary.maxwell.magnetic_field(RT_space, RT_space, NC_space, 1j*s)
-        identity= -bempp.api.operators.boundary.sparse.identity(RT_space, RT_space, NC_space)
-        identity2=bempp.api.operators.boundary.sparse.identity(RT_space, RT_space, RT_space)
-        blocks=np.array([[None,None], [None,None]])
-        blocks[0,0] = -elec.weak_form()
-        blocks[0,1] =  magn.weak_form()-1.0/2*identity.weak_form()
-        blocks[1,0] = -magn.weak_form()-1.0/2*identity.weak_form()
-        blocks[1,1] = -elec.weak_form()
-        return [bempp.api.BlockedDiscreteOperator(blocks),identity2]
-    def harmonicForward(self,s,b,precomp = None):
-        return precomp[0]*b
-        
-    def calcJacobian(self,x,t,inhom):
-        weightphiGF = bempp.api.GridFunction(RT_space,coefficients = x[:dof])
-        weightIncGF = bempp.api.GridFunction(RT_space,coefficients = inhom)
-        jacob = sparseWeightedMM(RT_space,weightphiGF+weightIncGF,Da,gridfunList,neighborlist,domainDict)
-        return jacob
-
-    def applyJacobian(self,jacob,x):
-        dof = len(x)/2
-        jx = 1j*np.zeros(2*dof)
-        jx[:dof] = jacob*x[:dof]
-        return jx
-
-    def nonlinearity(self,coeff,t,inhom):
-        dof = len(coeff)/2
-        phiGridFun = bempp.api.GridFunction(RT_space,coefficients=coeff[:dof]) 
-        gTHFun = bempp.api.GridFunction(RT_space,coefficients = inhom)
-        agridFun= applyNonlinearity(phiGridFun+gTHFun,a,gridfunList,domainDict)
-        result = np.zeros(2*dof) 
-        result[:dof] = id_weak*agridFun.coefficients
-        return result
-
-    def righthandside(self,t,history=None):
-        def func_rhs(x,n,domain_index,result):
-            inc =  np.array([np.exp(-50*(x[2]-t+2)**2), 0. * x[2], 0. * x[2]])    
-            tang = np.cross(n,np.cross(inc, n))
-            curlU=np.array([ 0. * x[2],-100*(x[2]-t+2)*np.exp(-50*(x[2]-t+2)**2), 0. * x[2]])   
-            result[:] = tang
-            #return np.cross(curlU,n)
-        RT_space=bempp.api.function_space(grid, "RT",0)
-        gridfunrhs = bempp.api.GridFunction(RT_space,fun = func_rhs,dual_space = RT_space)
-        dof = RT_space.global_dof_count
-        rhs = np.zeros(dof*2)
-        rhs[:dof] = gridfunrhs.coefficients
-        rhs[:dof] = id_weak*gridfunrhs.coefficients
-        #print(np.linalg.norm(rhs))
-        return rhs
-
 def calcRighthandside(c_RK,grid,N,T):
     m = len(c_RK)
     tau = T*1.0/N
@@ -100,44 +51,99 @@ def calcRighthandside(c_RK,grid,N,T):
     gTH = np.concatenate((np.zeros((dof,1)),gTH),axis = 1)
     #rhs[0:dof,:]=np.real(gTH)-rhs[0:dof,:]
     return -gTH
-OrderQF = 8
-bempp.api.global_parameters.quadrature.near.max_rel_dist = 2
-bempp.api.global_parameters.quadrature.near.single_order =OrderQF-1
-bempp.api.global_parameters.quadrature.near.double_order = OrderQF-1
-bempp.api.global_parameters.quadrature.medium.max_rel_dist =4
-bempp.api.global_parameters.quadrature.medium.single_order =OrderQF-2
-bempp.api.global_parameters.quadrature.medium.double_order =OrderQF-2
-bempp.api.global_parameters.quadrature.far.single_order =OrderQF-3
-bempp.api.global_parameters.quadrature.far.double_order =OrderQF-3
-bempp.api.global_parameters.quadrature.double_singular = OrderQF
-bempp.api.global_parameters.hmat.eps=10**-6
-bempp.api.global_parameters.hmat.admissibility='strong'
 
 
-model = ScatModel()
-import time
-start = time.time()
-m = 3
-[A_RK,b_RK,c_RK,m] = model.tdForward.get_method_characteristics("RadauIIA-"+str(m))
-N =50
-T=4
+N =10
+dx = 1
+m=2
+def nonlinearScattering(N,dx,m):
+    grid = bempp.api.shapes.sphere(h=dx)
+    RT_space=bempp.api.function_space(grid, "RT",0)
+    gridfunList,neighborlist,domainDict = precompMM(RT_space)
+    id_op=bempp.api.operators.boundary.sparse.identity(RT_space, RT_space, RT_space)
+    id_weak = id_op.weak_form()
+    class ScatModel(CQModel):
+        def precomputing(self,s):
+            NC_space=bempp.api.function_space(grid, "NC",0)
+            RT_space=bempp.api.function_space(grid, "RT",0)
+            elec = -bempp.api.operators.boundary.maxwell.electric_field(RT_space, RT_space, NC_space,1j*s)
+            magn = -bempp.api.operators.boundary.maxwell.magnetic_field(RT_space, RT_space, NC_space, 1j*s)
+            identity= -bempp.api.operators.boundary.sparse.identity(RT_space, RT_space, NC_space)
+            identity2=bempp.api.operators.boundary.sparse.identity(RT_space, RT_space, RT_space)
+            blocks=np.array([[None,None], [None,None]])
+            blocks[0,0] = -elec.weak_form()
+            blocks[0,1] =  magn.weak_form()-1.0/2*identity.weak_form()
+            blocks[1,0] = -magn.weak_form()-1.0/2*identity.weak_form()
+            blocks[1,1] = -elec.weak_form()
+            return [bempp.api.BlockedDiscreteOperator(blocks),identity2]
+        def harmonicForward(self,s,b,precomp = None):
+            return precomp[0]*b
+        def calcJacobian(self,x,t,inhom):
+            weightphiGF = bempp.api.GridFunction(RT_space,coefficients = x[:dof])
+            weightIncGF = bempp.api.GridFunction(RT_space,coefficients = inhom)
+            jacob = sparseWeightedMM(RT_space,weightphiGF+weightIncGF,Da,gridfunList,neighborlist,domainDict)
+            return jacob
+        def applyJacobian(self,jacob,x):
+            dof = len(x)/2
+            jx = 1j*np.zeros(2*dof)
+            jx[:dof] = jacob*x[:dof]
+            return jx
+        def nonlinearity(self,coeff,t,inhom):
+            dof = len(coeff)/2
+            phiGridFun = bempp.api.GridFunction(RT_space,coefficients=coeff[:dof]) 
+            gTHFun = bempp.api.GridFunction(RT_space,coefficients = inhom)
+            agridFun= applyNonlinearity(phiGridFun+gTHFun,a,gridfunList,domainDict)
+            result = np.zeros(2*dof) 
+            result[:dof] = id_weak*agridFun.coefficients
+            return result
+    
+        def righthandside(self,t,history=None):
+            def func_rhs(x,n,domain_index,result):
+                inc =  np.array([np.exp(-50*(x[2]-t+2)**2), 0. * x[2], 0. * x[2]])    
+                tang = np.cross(n,np.cross(inc, n))
+                curlU=np.array([ 0. * x[2],-100*(x[2]-t+2)*np.exp(-50*(x[2]-t+2)**2), 0. * x[2]])   
+                result[:] = tang
+                #return np.cross(curlU,n)
+            RT_space=bempp.api.function_space(grid, "RT",0)
+            gridfunrhs = bempp.api.GridFunction(RT_space,fun = func_rhs,dual_space = RT_space)
+            dof = RT_space.global_dof_count
+            rhs = np.zeros(dof*2)
+            rhs[:dof] = gridfunrhs.coefficients
+            rhs[:dof] = id_weak*gridfunrhs.coefficients
+            #print(np.linalg.norm(rhs))
+            return rhs
+    model = ScatModel()
+    import time
+    start = time.time()
+    [A_RK,b_RK,c_RK,m] = model.tdForward.get_method_characteristics("RadauIIA-"+str(m))
+    T=4
+    dof = RT_space.global_dof_count
+    print("GLOBAL DOF: ",dof)
+    rhsInhom = calcRighthandside(c_RK,grid,N,T)
+    print("Finished RHS.")
+    sol ,counters  = model.simulate(T,N,rhsInhom =rhsInhom, method = "RadauIIA-2")
+    end = time.time()
+    import matplotlib.pyplot as plt
+    dof = RT_space.global_dof_count
+    norms = [np.linalg.norm(sol[:,k]) for k in range(len(sol[0,:]))]
+    return sol
 
-dof = RT_space.global_dof_count
-print("GLOBAL DOF: ",dof)
-rhsInhom = calcRighthandside(c_RK,grid,N,T)
-print("Finished RHS.")
-sol ,counters  = model.simulate(T,N,rhsInhom =rhsInhom, method = "RadauIIA-2")
-end = time.time()
-import matplotlib.pyplot as plt
-dof = RT_space.global_dof_count
-norms = [np.linalg.norm(sol[:,k]) for k in range(len(sol[0,:]))]
-np.save('data/solh1N50m3.npy',sol)
 
-np.save('data/counterssmall.npy',counters)
+AmTime = 6
+AmSpace = 3
+Ns = np.zeros(AmTime)
+dxs = np.zeros(AmSpace)
+m = 2
+for indexSpace in range(AmSpace):
+    for indexTime in range(AmTime):
+        N  = 4*2**indexTime 
+        dx = 2**(-j/2)
+        sol = nonlinearScattering(N,dx,m)
+        np.save('data/solh'+str(dx)+'N'+str(N)+'m'+str(m)+'.npy',sol)
 
-plt.plot(norms)
-
-plt.show()
+#np.save('data/counterssmall.npy',counters)
+#plt.plot(norms)
+#plt.show()
 #norms = [bempp.api.GridFunction(RT_space,coefficients = sol[:dof,k]).l2_norm() for k in range(len(sol[0,:]))]
 #plt.plot(norms)
 #plt.show()
