@@ -2,6 +2,7 @@ from cqtoolbox import CQModel
 from linearcq import Conv_Operator
 from customOperators import precompMM,sparseWeightedMM,applyNonlinearity
 import bempp.api
+import os.path
 import numpy as np
 OrderQF = 8
 bempp.api.global_parameters.quadrature.near.max_rel_dist = 2
@@ -137,9 +138,18 @@ m = 2
 for indexSpace in range(AmSpace):
     for indexTime in range(AmTime):
         N  = 4*2**indexTime 
-        dx = 2**(-j/2)
+        Ns[indexTime] = N
+        #dx = 0.75**(-indexSpace/2)
+        dx = 2**(-indexSpace*1.0/2)
+        filename = 'data/solh'+str(round(dx,3))+'N'+str(N)+'m'+str(m)+'.npy'
+        if os.path.isfile(filename):
+            print("The file "+filename+ " already exists, jumping simulation.")
+            continue
+        dxs[indexSpace] = dx
+
+        print("Next file to be computed: "+filename)
         sol = nonlinearScattering(N,dx,m)
-        np.save('data/solh'+str(dx)+'N'+str(N)+'m'+str(m)+'.npy',sol)
+        np.save(filename,sol)
 
 #np.save('data/counterssmall.npy',counters)
 #plt.plot(norms)
