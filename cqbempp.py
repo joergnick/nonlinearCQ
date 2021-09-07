@@ -54,9 +54,9 @@ def calcRighthandside(c_RK,grid,N,T):
     return -gTH
 
 
-N =10
-dx = 1
-m=2
+#N =10
+#dx = 1
+#m=2
 def nonlinearScattering(N,dx,m):
     grid = bempp.api.shapes.sphere(h=dx)
     RT_space=bempp.api.function_space(grid, "RT",0)
@@ -130,8 +130,8 @@ def nonlinearScattering(N,dx,m):
     return sol
 
 
-AmTime = 6
-AmSpace = 3
+AmTime = 7
+AmSpace = 6
 Ns = np.zeros(AmTime)
 dxs = np.zeros(AmSpace)
 m = 2
