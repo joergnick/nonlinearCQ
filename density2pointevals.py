@@ -1,9 +1,12 @@
 import numpy as np
 import bempp.api
-grid = bempp.api.shapes.sphere(h=0.3)
+#grid = bempp.api.shapes.sphere(h=2**(0))
+grid = bempp.api.shapes.sphere(h=2**(-3.0/2))
 RT_space = bempp.api.function_space(grid,"RT",0)
 dof = RT_space.global_dof_count
-sol = np.load('data/sol.npy')
+#sol = np.load('data/solh1.0N64m2.npy')
+sol = np.load('data/solh0.354N256m2.npy')
+m=2
 print("Does sol contain Nan values? Answer: "+str(np.isnan(sol).any()))
 N = (len(sol[0,:])-1)/2
 print("N= ",N)
@@ -25,7 +28,7 @@ x_a=-2
 x_b=2
 y_a=-2
 y_b=2
-n_grid_points=150
+n_grid_points= 150
 nx = n_grid_points
 nz = n_grid_points
 ############################################
@@ -34,7 +37,7 @@ plot_grid = np.mgrid[y_a:y_b:1j*n_grid_points, x_a:x_b:1j*n_grid_points]
 #print(plot_grid)
 #points = np.vstack( ( plot_grid[0].ravel() , plot_grid[1].ravel() , 0.25*np.ones(plot_grid[0].size) ) )
 points = np.vstack( ( plot_grid[0].ravel()  , 0*np.ones(plot_grid[0].size) , plot_grid[1].ravel()) )
-
+radius = points[0,:]**2+points[1,:]**2+points[2,:]**2
 def kirchhoff_repr(s,lambda_data):
     print("norm(density)=",np.linalg.norm(lambda_data))
     if np.linalg.norm(lambda_data)<10**(-3):
@@ -68,12 +71,13 @@ for j in range(N+1):
     #incident_field_data[radius<1]=np.nan
     scat_eval=uscat[:,j].reshape(3,nx*nz)
     #print(scat_eval)
-    field_data = -scat_eval + incident_field_data
+    field_data = scat_eval + incident_field_data
     #field_data = scat_eval 
     #field_data = incident_field_data 
     squared_field_density = np.real(np.sum(field_data * field_data,axis = 0))
     u_ges[:,j]=squared_field_density.T
     #squared_field_density=field_data[2,:]
+    squared_field_density[radius<1]=np.nan
     #squared_field_density[radius<1]=np.nan
     plt.imshow(squared_field_density.reshape((nx, nz)).T,
                cmap='coolwarm', origin='lower',
@@ -86,4 +90,4 @@ for j in range(N+1):
     plt.clim((-1,1))
 
 import scipy.io
-scipy.io.savemat('data/h02.mat',dict(u_ges=u_ges,N=N,T=T,plot_grid=plot_grid,points=points))
+scipy.io.savemat('data/h0354.mat',dict(u_ges=u_ges,N=N,T=T,plot_grid=plot_grid,points=points))
