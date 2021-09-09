@@ -14,7 +14,7 @@ bempp.api.global_parameters.quadrature.medium.double_order =OrderQF-2
 bempp.api.global_parameters.quadrature.far.single_order =OrderQF-3
 bempp.api.global_parameters.quadrature.far.double_order =OrderQF-3
 bempp.api.global_parameters.quadrature.double_singular = OrderQF
-bempp.api.global_parameters.hmat.eps=10**-5
+bempp.api.global_parameters.hmat.eps=10**-2
 bempp.api.global_parameters.hmat.admissibility='strong'
 def a(x):
     return np.linalg.norm(x)**(-0.5)*x
@@ -130,8 +130,8 @@ def nonlinearScattering(N,dx,m):
     return sol
 
 
-AmTime = 7
-AmSpace = 6
+AmTime = 6
+AmSpace = 7
 Ns = np.zeros(AmTime)
 dxs = np.zeros(AmSpace)
 m = 2
@@ -146,7 +146,6 @@ for indexSpace in range(AmSpace):
             print("The file "+filename+ " already exists, jumping simulation.")
             continue
         dxs[indexSpace] = dx
-
         print("Next file to be computed: "+filename)
         sol = nonlinearScattering(N,dx,m)
         np.save(filename,sol)

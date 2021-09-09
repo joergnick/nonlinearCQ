@@ -1,11 +1,11 @@
 import numpy as np
 import bempp.api
 #grid = bempp.api.shapes.sphere(h=2**(0))
-grid = bempp.api.shapes.sphere(h=2**(-3.0/2))
+grid = bempp.api.shapes.sphere(h=2**(-0/2))
 RT_space = bempp.api.function_space(grid,"RT",0)
 dof = RT_space.global_dof_count
 #sol = np.load('data/solh1.0N64m2.npy')
-sol = np.load('data/solh0.354N256m2.npy')
+sol = np.load('data/solh1.0N30m2.npy')
 m=2
 print("Does sol contain Nan values? Answer: "+str(np.isnan(sol).any()))
 N = (len(sol[0,:])-1)/2
@@ -90,4 +90,4 @@ for j in range(N+1):
     plt.clim((-1,1))
 
 import scipy.io
-scipy.io.savemat('data/h0354.mat',dict(u_ges=u_ges,N=N,T=T,plot_grid=plot_grid,points=points))
+scipy.io.savemat('data/h01N30.mat',dict(u_ges=u_ges,N=N,T=T,plot_grid=plot_grid,points=points))

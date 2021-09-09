@@ -1,3 +1,4 @@
+#import psutil
 from scipy.sparse.linalg import gmres
 from scipy.optimize import newton_krylov
 import numpy as np
@@ -103,7 +104,7 @@ class CQModel:
         NewtonLambda = lambda x: NewtonFunc(x)
         from scipy.sparse.linalg import LinearOperator
         NewtonOperator = LinearOperator((m*dof,m*dof),NewtonLambda)
-        dxlong,info = gmres(NewtonOperator,rhsLong,maxiter = 500,x0=x0pureLong,tol=1e-5)
+        dxlong,info = gmres(NewtonOperator,rhsLong,restart = 2*dof,maxiter = 2*dof,x0=x0pureLong,tol=1e-5)
         #dxlong,info = gmres(NewtonOperator,rhsLong,restart = 2*dof,maxiter = 2*dof,x0=x0pureLong,tol=1e-5)
         if info != 0:
             print("GMRES Info not zero, Info: ", info)
@@ -111,10 +112,11 @@ class CQModel:
         for stageInd in range(m):
             dx[:,stageInd] = dxlong[dof*stageInd:dof*(stageInd+1)]
         x1 = x0-coeff*dx
+        #print("np.linalg.norm(dx) = ",np.linalg.norm(dx))
         if coeff*np.linalg.norm(dx)/dof<tolsolver:
             info = 0
         else:
-            info = coeff*np.linalg.norm(dx)
+            info = coeff*np.linalg.norm(dx)/dof
         return np.real(x1),info
 
     def createFFTLengths(self,N):
@@ -150,6 +152,7 @@ class CQModel:
             dof = len(self.righthandside(0))
         except:
             dof = 1
+
         ## Actual solving:
         [A_RK,b_RK,c_RK,m] = self.tdForward.get_method_characteristics(method)
         charMatrix0 = np.linalg.inv(A_RK)/tau
@@ -179,7 +182,7 @@ class CQModel:
                     extr[:,i] = np.zeros(dof)
    #         ###  Use simplified Weighted Newon's method ######
             sol[:,j*m+1:(j+1)*m+1],info = self.newtonsolver(tj,tau,c_RK,deltaEigs,rhs[:,j*m+1:(j+1)*m+1],W0,Tdiag,extr,rhsInhom[:,j*m+1:(j+1)*m+1])
-            print("First Newton step finished. Info: ",info, "Norm of solution: ", np.linalg.norm(sol[:,j*m+1:(j+1)*m+1]))
+            #print("First Newton step finished. Info: ",info, "Norm of solution: ", np.linalg.norm(sol[:,j*m+1:(j+1)*m+1]))
 
             counter = 0
             thresh = 3
@@ -187,14 +190,14 @@ class CQModel:
                     if counter <=thresh:
                         scal = 1 
                     else:
-                        scal = 0.25
+                        scal = 0.9
                     sol[:,j*m+1:(j+1)*m+1],info = self.newtonsolver(tj,tau,c_RK,deltaEigs,rhs[:,j*m+1:(j+1)*m+1],W0,Tdiag,sol[:,j*m+1:(j+1)*m+1],rhsInhom[:,j*m+1:(j+1)*m+1],coeff=scal**(counter-thresh))
-                    print("INFO AFTER {} STEP: ".format(counter),info)
+            #        print("INFO AFTER {} STEP: ".format(counter),info)
                     if np.linalg.norm(sol[:,j*m+1:(j+1)*m+1])>10**5:
                         sol[:,j*m+1:(j+1)*m+1] = extr
                         break
                     counter = counter+1
-            print("Extr-sol: ",np.linalg.norm(extr-sol[:,j*m+1:(j+1)*m+1]))
+            #print("Extr-sol: ",np.linalg.norm(extr-sol[:,j*m+1:(j+1)*m+1]))
             counters[j] = counter
 
             ## Solving Completed #####################################
