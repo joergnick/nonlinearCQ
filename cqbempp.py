@@ -1,10 +1,11 @@
 from cqtoolbox import CQModel
+
 from linearcq import Conv_Operator
 from customOperators import precompMM,sparseWeightedMM,applyNonlinearity
 import bempp.api
 import os.path
 import numpy as np
-OrderQF = 8
+OrderQF = 7
 bempp.api.global_parameters.quadrature.near.max_rel_dist = 2
 bempp.api.global_parameters.quadrature.near.single_order =OrderQF-1
 bempp.api.global_parameters.quadrature.near.double_order = OrderQF-1
@@ -122,7 +123,7 @@ def nonlinearScattering(N,dx,m):
     print("GLOBAL DOF: ",dof)
     rhsInhom = calcRighthandside(c_RK,grid,N,T)
     print("Finished RHS.")
-    sol ,counters  = model.simulate(T,N,rhsInhom =rhsInhom, method = "RadauIIA-2")
+    sol ,counters  = model.simulate(T,N,rhsInhom =rhsInhom, method = "RadauIIA-2",reUse=False)
     end = time.time()
     import matplotlib.pyplot as plt
     dof = RT_space.global_dof_count
@@ -148,7 +149,7 @@ for indexSpace in range(AmSpace):
         dxs[indexSpace] = dx
         print("Next file to be computed: "+filename)
         sol = nonlinearScattering(N,dx,m)
-        np.save(filename,sol)
+        #np.save(filename,sol)
 
 #np.save('data/counterssmall.npy',counters)
 #plt.plot(norms)

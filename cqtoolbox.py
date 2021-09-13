@@ -3,6 +3,7 @@ from scipy.sparse.linalg import gmres
 from scipy.optimize import newton_krylov
 import numpy as np
 from linearcq import Conv_Operator
+import sys
 class CQModel:
     def __init__(self):
         self.tdForward = Conv_Operator(self.forwardWrapper)
@@ -56,7 +57,7 @@ class CQModel:
             jacobList[stageInd] = jacoba
         return jacobList
 
-    def newtonsolver(self,t,tau,c_RK,deltaEigs,rhs,W0,Tdiag, x0,rhsInhom,tolsolver = 10**(-6),debugmode=False,coeff = 1):
+    def newtonsolver(self,t,tau,c_RK,deltaEigs,rhs,W0,Tdiag, x0,rhsInhom,tolsolver = 10**(-4),debugmode=False,coeff = 1):
         x0pure = x0
         dof = len(rhs)
         m = len(W0)
@@ -144,7 +145,7 @@ class CQModel:
             extrU = extrU+gammas[j]*u[:,-p-1+j]
         return extrU
     
-    def simulate(self,T,N,rhsInhom=None,method = "RadauIIA-2",tolsolver = 10**(-5)):
+    def simulate(self,T,N,rhsInhom=None,method = "RadauIIA-2",tolsolver = 10**(-5),reUse=True):
         tau = T*1.0/N
         ## Initializing right-hand side:
         lengths = self.createFFTLengths(N)
@@ -172,6 +173,10 @@ class CQModel:
             rhsInhom = np.zeros((dof,m*N+1))
         for j in range(0,N):
             print(j*1.0/N)
+            memoryUsage = 0
+            for obj in self.freqObj.values():
+                memoryUsage += sys.getsizeof(obj)
+            print("Memory size of Operator tail: ",memoryUsage)
             ## Calculating solution at timepoint tj
             tj       = tau*j
             for i in range(m):
@@ -192,7 +197,7 @@ class CQModel:
                     else:
                         scal = 0.9
                     sol[:,j*m+1:(j+1)*m+1],info = self.newtonsolver(tj,tau,c_RK,deltaEigs,rhs[:,j*m+1:(j+1)*m+1],W0,Tdiag,sol[:,j*m+1:(j+1)*m+1],rhsInhom[:,j*m+1:(j+1)*m+1],coeff=scal**(counter-thresh))
-            #        print("INFO AFTER {} STEP: ".format(counter),info)
+                    print("INFO AFTER {} STEP: ".format(counter),info)
                     if np.linalg.norm(sol[:,j*m+1:(j+1)*m+1])>10**5:
                         sol[:,j*m+1:(j+1)*m+1] = extr
                         break
@@ -211,8 +216,9 @@ class CQModel:
             ## Updating Global History: 
             currLenCut = min(currLen,N-j-1)
             rhs[:,(j+1)*m+1:(j+1)*m+1+currLenCut*m] = rhs[:,(j+1)*m+1:(j+1)*m+1+currLenCut*m]-localconvHist[:,currLen*m:currLen*m+currLenCut*m]
-        self.freqUse = dict()
-        self.freqObj = dict()
+            if not reUse:
+                self.freqUse = dict()
+                self.freqObj = dict()
         return sol ,counters
  
 #    def integrate(self,T,N,method = "RadauIIA-2",tolsolver = 10**(-8)):
