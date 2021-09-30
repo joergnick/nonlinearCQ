@@ -55,11 +55,19 @@ def calcRighthandside(c_RK,grid,N,T):
     return -gTH
 
 
-#N =10
-#dx = 1
-#m=2
-def nonlinearScattering(N,dx,m):
-    grid = bempp.api.shapes.sphere(h=dx)
+def nonlinearScattering(N,gridfilename,T,m):
+    import scipy.io
+    mat_contents=scipy.io.loadmat(gridfilename)
+    Nodes=np.array(mat_contents['Nodes']).T
+    rawElements=mat_contents['Elements']
+    for j in range(len(rawElements)):
+        betw=rawElements[j][0]
+        rawElements[j][0]=rawElements[j][1]
+        rawElements[j][1]=betw
+    Elements=np.array(rawElements).T
+    Elements=Elements-1
+    grid=bempp.api.grid_from_element_data(Nodes,Elements)
+
     RT_space=bempp.api.function_space(grid, "RT",0)
     gridfunList,neighborlist,domainDict = precompMM(RT_space)
     id_op=bempp.api.operators.boundary.sparse.identity(RT_space, RT_space, RT_space)
@@ -118,7 +126,6 @@ def nonlinearScattering(N,dx,m):
     import time
     start = time.time()
     [A_RK,b_RK,c_RK,m] = model.tdForward.get_method_characteristics("RadauIIA-"+str(m))
-    T=4
     dof = RT_space.global_dof_count
     print("GLOBAL DOF: ",dof)
     rhsInhom = calcRighthandside(c_RK,grid,N,T)
@@ -130,26 +137,18 @@ def nonlinearScattering(N,dx,m):
     norms = [np.linalg.norm(sol[:,k]) for k in range(len(sol[0,:]))]
     return sol
 
-
-AmTime = 6
-AmSpace = 7
-Ns = np.zeros(AmTime)
-dxs = np.zeros(AmSpace)
-m = 2
-for indexSpace in range(AmSpace):
-    for indexTime in range(AmTime):
-        N  = 4*2**indexTime 
-        Ns[indexTime] = N
-        #dx = 0.75**(-indexSpace/2)
-        dx = 2**(-indexSpace*1.0/2)
-        filename = 'data/solh'+str(round(dx,3))+'N'+str(N)+'m'+str(m)+'.npy'
-        if os.path.isfile(filename):
-            print("The file "+filename+ " already exists, jumping simulation.")
-            continue
-        dxs[indexSpace] = dx
-        print("Next file to be computed: "+filename)
-        sol = nonlinearScattering(N,dx,m)
-        np.save(filename,sol)
+gridfilename='grids/TorusDOF896.mat'
+m = 3
+N= 100
+T=4
+sol = nonlinearScattering(N,gridfilename,T,m)
+filename = 'data/donutDOF896.npy'
+resDict = dict()
+resDict["sol"] = sol
+resDict["T"] = T
+resDict["m"] = m
+resDict["N"] = N
+np.save(filename,resDict)
 
 #np.save('data/counterssmall.npy',counters)
 #plt.plot(norms)
