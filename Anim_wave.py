@@ -31,6 +31,6 @@ imobj = ax.imshow( np.zeros((200, 200)), origin='lower', alpha=1.0, zorder=1, as
 
 
 anim = animation.FuncAnimation(fig, animate, init_func=init, repeat = True,
-                               frames=range(0,30), interval=20, blit=True, repeat_delay=500)
-anim.save('NonlinearSphere2.mp4',fps=40,dpi=300,bitrate=-1)
+                               frames=range(0,100), interval=20, blit=True, repeat_delay=500)
+anim.save('NonlinearDonut.mp4',fps=40,dpi=300,bitrate=-1)
 plt.show()

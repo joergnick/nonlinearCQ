@@ -52,7 +52,7 @@ def calcRighthandside(c_RK,grid,N,T):
     gTH=IntegralOperator.apply_RKconvol(curls,T,method="RadauIIA-"+str(m),show_progress=False)
     gTH = np.concatenate((np.zeros((dof,1)),gTH),axis = 1)
     #rhs[0:dof,:]=np.real(gTH)-rhs[0:dof,:]
-    return -gTH
+    return gTH
 
 
 def nonlinearScattering(N,gridfilename,T,m):
@@ -110,7 +110,7 @@ def nonlinearScattering(N,gridfilename,T,m):
         def righthandside(self,t,history=None):
             def func_rhs(x,n,domain_index,result):
                 inc =  np.array([np.exp(-50*(x[2]-t+2)**2), 0. * x[2], 0. * x[2]])    
-                tang = np.cross(n,np.cross(inc, n))
+                tang = np.cross(np.cross(inc, n),n)
                 curlU=np.array([ 0. * x[2],-100*(x[2]-t+2)*np.exp(-50*(x[2]-t+2)**2), 0. * x[2]])   
                 result[:] = tang
                 #return np.cross(curlU,n)
@@ -130,19 +130,19 @@ def nonlinearScattering(N,gridfilename,T,m):
     print("GLOBAL DOF: ",dof)
     rhsInhom = calcRighthandside(c_RK,grid,N,T)
     print("Finished RHS.")
-    sol ,counters  = model.simulate(T,N,rhsInhom =rhsInhom, method = "RadauIIA-2",reUse=False)
+    sol ,counters  = model.simulate(T,N,rhsInhom =rhsInhom, method = "RadauIIA-2",reUse=True)
     end = time.time()
     import matplotlib.pyplot as plt
     dof = RT_space.global_dof_count
     norms = [np.linalg.norm(sol[:,k]) for k in range(len(sol[0,:]))]
     return sol
 
-gridfilename='grids/TorusDOF896.mat'
+gridfilename='grids/TorusDOF340.mat'
 m = 3
 N= 100
 T=4
 sol = nonlinearScattering(N,gridfilename,T,m)
-filename = 'data/donutDOF896.npy'
+filename = 'data/donutDOF340N100.npy'
 resDict = dict()
 resDict["sol"] = sol
 resDict["T"] = T

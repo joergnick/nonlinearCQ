@@ -1,13 +1,30 @@
 import numpy as np
 import bempp.api
 #grid = bempp.api.shapes.sphere(h=2**(0))
-grid = bempp.api.shapes.sphere(h=2**(-0/2))
+import scipy.io
+mat_contents=scipy.io.loadmat("grids/TorusDOF340.mat")
+Nodes=np.array(mat_contents['Nodes']).T
+rawElements=mat_contents['Elements']
+for j in range(len(rawElements)):
+    betw=rawElements[j][0]
+    rawElements[j][0]=rawElements[j][1]
+    rawElements[j][1]=betw
+Elements=np.array(rawElements).T
+Elements=Elements-1
+grid=bempp.api.grid_from_element_data(Nodes,Elements)
+
+
 RT_space = bempp.api.function_space(grid,"RT",0)
 dof = RT_space.global_dof_count
 #sol = np.load('data/solh1.0N64m2.npy')
-sol = np.load('data/solh1.0N30m2.npy')
-m=2
+solDict = np.load('data/donutDOF340.npy').item()
+
+sol = solDict["sol"]
+
 print("Does sol contain Nan values? Answer: "+str(np.isnan(sol).any()))
+m = solDict["m"]
+T = solDict["T"]
+
 N = (len(sol[0,:])-1)/2
 print("N= ",N)
 dof = len(sol[:,0])/2
@@ -40,19 +57,28 @@ points = np.vstack( ( plot_grid[0].ravel()  , 0*np.ones(plot_grid[0].size) , plo
 radius = points[0,:]**2+points[1,:]**2+points[2,:]**2
 def kirchhoff_repr(s,lambda_data):
     print("norm(density)=",np.linalg.norm(lambda_data))
-    if np.linalg.norm(lambda_data)<10**(-3):
+    if (np.linalg.norm(lambda_data)<10**(-3)) or (np.real(s)>50):
         print("Jumped")
         return np.zeros(n_grid_points**2*3)
     phigrid=bempp.api.GridFunction(RT_space,coefficients=lambda_data[0:dof],dual_space=RT_space)
     psigrid=bempp.api.GridFunction(RT_space,coefficients=lambda_data[dof:2*dof],dual_space=RT_space)
-    slp_pot = bempp.api.operators.potential.maxwell.electric_field(RT_space, points, s*1j)
-    dlp_pot = bempp.api.operators.potential.maxwell.magnetic_field(RT_space, points, s*1j)
-    scattered_field_data = -slp_pot * phigrid+dlp_pot*psigrid
+    print("s: ",s)
+    trycounter = 0
+    while trycounter<10:
+        try:
+            slp_pot = bempp.api.operators.potential.maxwell.electric_field(RT_space, points, s*1j)
+            dlp_pot = bempp.api.operators.potential.maxwell.magnetic_field(RT_space, points, s*1j)
+            scattered_field_data = -slp_pot * phigrid+dlp_pot*psigrid
+            break
+        except:
+            print("EXCEPTION CAUGHT, TRYCOUNTER : ",trycounter)
+            trycounter +=1
+
+    print("Is any field nan ? ",np.isnan(scattered_field_data).any())
     scattered_field_data[np.isnan(scattered_field_data)] = 0 
     return scattered_field_data.reshape(n_grid_points**2*3,1)[:,0]
 from linearcq import Conv_Operator
 mSpt_Dpt = Conv_Operator(kirchhoff_repr)
-T=4
 uscatStages = mSpt_Dpt.apply_RKconvol(sol,T,method = "RadauIIA-2")
 uscat = uscatStages[:,::2]
 #uscat = np.zeros((n_grid_points**2*3,N))
@@ -71,13 +97,13 @@ for j in range(N+1):
     #incident_field_data[radius<1]=np.nan
     scat_eval=uscat[:,j].reshape(3,nx*nz)
     #print(scat_eval)
-    field_data = scat_eval + incident_field_data
+    field_data = -scat_eval + incident_field_data
     #field_data = scat_eval 
     #field_data = incident_field_data 
     squared_field_density = np.real(np.sum(field_data * field_data,axis = 0))
     u_ges[:,j]=squared_field_density.T
     #squared_field_density=field_data[2,:]
-    squared_field_density[radius<1]=np.nan
+    #squared_field_density[radius<1]=np.nan
     #squared_field_density[radius<1]=np.nan
     plt.imshow(squared_field_density.reshape((nx, nz)).T,
                cmap='coolwarm', origin='lower',
@@ -90,4 +116,4 @@ for j in range(N+1):
     plt.clim((-1,1))
 
 import scipy.io
-scipy.io.savemat('data/h01N30.mat',dict(u_ges=u_ges,N=N,T=T,plot_grid=plot_grid,points=points))
+scipy.io.savemat('data/DonutFieldDataDOF340.mat',dict(u_ges=u_ges,N=N,T=T,plot_grid=plot_grid,points=points))
